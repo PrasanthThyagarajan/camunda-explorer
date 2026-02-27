@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Camunda Dashboard — v7.16.0</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+
+<!-- ═══ Sidebar ══════════════════════════════════════════════════ -->
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <h1>🔧 Camunda Dashboard</h1>
+    <small>Platform v7.16.0</small>
+  </div>
+
+  <!-- Environment Quick-Switch -->
+  <div class="sidebar-env" onclick="switchPanel('environments')" title="Click to manage environments">
+    <div class="sidebar-env-label">Environment</div>
+    <div class="sidebar-env-name">
+      <div class="env-dot" id="sidebar-env-dot" style="background:#3b82f6"></div>
+      <span id="sidebar-env-name">Loading…</span>
+    </div>
+    <div class="sidebar-env-url" id="sidebar-env-url"></div>
+  </div>
+
+  <div class="sidebar-nav">
+    <div class="nav-group">
+      <div class="nav-group-title">Overview</div>
+      <div class="nav-item active" data-panel="health" onclick="switchPanel('health')">📊 Engine Health</div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title">Operations</div>
+      <div class="nav-item" data-panel="incidents" onclick="switchPanel('incidents')">🔴 Incidents <span class="badge" id="badge-incidents" style="display:none">0</span></div>
+      <div class="nav-item" data-panel="instances" onclick="switchPanel('instances')">⚙️ Process Instances</div>
+      <div class="nav-item" data-panel="jobs" onclick="switchPanel('jobs')">🔄 Jobs <span class="badge" id="badge-jobs" style="display:none">0</span></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title">Definitions</div>
+      <div class="nav-item" data-panel="dmn" onclick="switchPanel('dmn')">📋 DMN Evaluate</div>
+      <div class="nav-item" data-panel="definitions" onclick="switchPanel('definitions')">📄 Process Definitions</div>
+      <div class="nav-item" data-panel="deployments" onclick="switchPanel('deployments')">📦 Deployments</div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title">Workspace</div>
+      <div class="nav-item" data-panel="tasks" onclick="switchPanel('tasks')">✅ User Tasks</div>
+      <div class="nav-item" data-panel="history" onclick="switchPanel('history')">📜 History</div>
+      <div class="nav-item" data-panel="maintenance" onclick="switchPanel('maintenance')">🧹 Maintenance</div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title">Settings</div>
+      <div class="nav-item" data-panel="environments" onclick="switchPanel('environments')">🌐 Environments</div>
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <span class="status-dot" id="engine-status"></span>
+    <span id="engine-label">Checking engine…</span>
+  </div>
+</div>
+
+<!-- ═══ Main ═════════════════════════════════════════════════════ -->
+<div class="main">
+  <div class="topbar">
+    <h2 id="topbar-title">Engine Health</h2>
+    <span class="pill" id="topbar-env">
+      <span class="env-dot-sm" id="topbar-env-dot" style="background:#3b82f6"></span>
+      <span id="topbar-env-name">—</span>
+    </span>
+    <span class="pill" id="topbar-url"></span>
+    <button class="refresh-btn" onclick="refreshCurrentPanel()">↻ Refresh</button>
+  </div>
+  <div class="content">
+
+    <!-- ── Environments Panel ──────────────────────────── -->
+    <div class="panel" id="panel-environments">
+      <div class="section-title">🌐 Environment Setup</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.6">Configure different Camunda servers (Dev, Staging, Production, etc). Switch between them instantly — all panels will use the active environment.</p>
+
+      <div class="env-cards" id="env-cards"></div>
+
+      <!-- Add New Environment Form -->
+      <div class="env-form-card" id="env-add-form">
+        <h3 id="env-form-title">➕ Add New Environment</h3>
+        <input type="hidden" id="env-edit-id" value="" />
+        <div class="form-row">
+          <div class="form-group" style="flex:1">
+            <label>Environment Name</label>
+            <input type="text" id="env-name" placeholder="e.g. Production, Staging, Dev…" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Camunda REST API URL</label>
+          <input type="text" id="env-url" placeholder="http://camunda-server:8080/engine-rest" />
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group" style="flex:1">
+            <label>Username</label>
+            <input type="text" id="env-user" placeholder="Leave empty if no auth" autocomplete="off" />
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>Password</label>
+            <input type="password" id="env-pass" placeholder="Leave empty if no auth" autocomplete="off" />
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:12px">
+          <label>Color Tag</label>
+          <div class="color-options" id="env-colors">
+            <div class="color-opt selected" data-color="#3b82f6" style="background:#3b82f6" onclick="selectEnvColor(this)"></div>
+            <div class="color-opt" data-color="#22c55e" style="background:#22c55e" onclick="selectEnvColor(this)"></div>
+            <div class="color-opt" data-color="#eab308" style="background:#eab308" onclick="selectEnvColor(this)"></div>
+            <div class="color-opt" data-color="#ef4444" style="background:#ef4444" onclick="selectEnvColor(this)"></div>
+            <div class="color-opt" data-color="#a855f7" style="background:#a855f7" onclick="selectEnvColor(this)"></div>
+            <div class="color-opt" data-color="#ec4899" style="background:#ec4899" onclick="selectEnvColor(this)"></div>
+            <div class="color-opt" data-color="#14b8a6" style="background:#14b8a6" onclick="selectEnvColor(this)"></div>
+            <div class="color-opt" data-color="#f97316" style="background:#f97316" onclick="selectEnvColor(this)"></div>
+            <div class="color-opt" data-color="#64748b" style="background:#64748b" onclick="selectEnvColor(this)"></div>
+          </div>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" id="env-save-btn" onclick="saveEnvironment()">Add Environment</button>
+          <button class="btn btn-outline" onclick="testEnvConnection()">🔌 Test Connection</button>
+          <button class="btn btn-outline" id="env-cancel-btn" onclick="cancelEnvEdit()" style="display:none">Cancel</button>
+        </div>
+        <div id="env-test-result" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <!-- ── Health Panel ──────────────────────────────── -->
+    <div class="panel active" id="panel-health">
+      <div class="stats-row" id="health-stats"></div>
+      <div class="section-title">Process Statistics</div>
+      <div class="table-wrap" id="health-table"></div>
+
+      <!-- ── API Query Explorer ──────────────────────── -->
+      <div class="qe-container">
+        <div class="qe-header" onclick="toggleQueryExplorer()">
+          <span style="font-size:18px">🔍</span>
+          <h3>API Query Explorer</h3>
+          <span style="font-size:11px;color:var(--text3);opacity:.7">20 curated queries — select, tweak, execute</span>
+          <span class="qe-toggle" id="qe-toggle">▶</span>
+        </div>
+        <div class="qe-body" id="qe-body">
+          <!-- Query Selector Row -->
+          <div class="qe-row">
+            <div class="form-group" style="flex:1;min-width:320px">
+              <label>Select Query</label>
+              <select id="qe-query-select" onchange="onQeQuerySelect()">
+                <option value="">— Choose a query —</option>
+                <optgroup label="🔴 Incident Analysis">
+                  <option value="inc-all">All Active Incidents</option>
+                  <option value="inc-failed-job">Failed Job Incidents</option>
+                  <option value="inc-failed-ext">Failed External Task Incidents</option>
+                  <option value="inc-by-procdef">Incidents by Process Definition</option>
+                  <option value="inc-hist-open">Historic Incidents (Open)</option>
+                </optgroup>
+                <optgroup label="📊 Process Instances">
+                  <option value="pi-with-incidents">Instances With Active Incidents</option>
+                  <option value="pi-suspended">Suspended Instances</option>
+                  <option value="pi-active">Active Running Instances</option>
+                  <option value="pi-by-bkey">Search by Business Key</option>
+                  <option value="pi-by-variable">Search by Process Variable</option>
+                </optgroup>
+                <optgroup label="⚙️ Jobs & External Tasks">
+                  <option value="job-failed">Failed Jobs (No Retries)</option>
+                  <option value="job-with-exception">Jobs With Exceptions</option>
+                  <option value="ext-failed">Failed External Tasks</option>
+                </optgroup>
+                <optgroup label="📜 History & Audit">
+                  <option value="hist-last-24h">Recently Started (Last 24h)</option>
+                  <option value="hist-completed">Recently Completed</option>
+                  <option value="hist-long-running">Long-Running Instances</option>
+                  <option value="hist-var-search">Search Historic Variable by Name</option>
+                  <option value="hist-running-activities">Currently Running Activities</option>
+                </optgroup>
+                <optgroup label="📦 Definitions & Deployments">
+                  <option value="def-latest">Latest Process Definitions</option>
+                  <option value="def-statistics">Process Definition Statistics</option>
+                </optgroup>
+                <optgroup label="🛠 Custom">
+                  <option value="custom">Custom Query…</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="form-group" style="min-width:100px">
+              <label>Max Results</label>
+              <input type="number" id="qe-max" value="50" min="1" max="1000" style="min-width:100px;width:100px" />
+            </div>
+          </div>
+
+          <!-- Query Description -->
+          <div class="qe-hint" id="qe-hint" style="display:none"></div>
+
+          <!-- Path Row -->
+          <div class="qe-label-row">
+            <label>Endpoint</label>
+            <span class="qe-method-badge post" id="qe-method-badge">POST</span>
+          </div>
+          <div class="qe-path-row">
+            <select id="qe-method" onchange="document.getElementById('qe-method-badge').textContent=this.value;document.getElementById('qe-method-badge').className='qe-method-badge '+this.value.toLowerCase()">
+              <option value="GET">GET</option>
+              <option value="POST" selected>POST</option>
+            </select>
+            <input type="text" id="qe-path" value="" placeholder="e.g. /incident or /history/process-instance" />
+          </div>
+
+          <!-- JSON Query Editor -->
+          <div class="qe-label-row">
+            <label>Request Body</label>
+            <span style="font-size:10px;color:var(--text3)">(JSON)</span>
+          </div>
+          <div class="qe-editor">
+            <textarea id="qe-body-input" spellcheck="false" placeholder='{ "sortBy": "incidentTimestamp", "sortOrder": "desc" }'></textarea>
+          </div>
+
+          <!-- Actions -->
+          <div class="qe-actions">
+            <button class="btn btn-primary" onclick="executeQuery()">▶ Execute Query</button>
+            <button class="btn btn-outline" onclick="copyQueryResults()">📋 Copy Results</button>
+            <button class="btn btn-outline" onclick="resetQueryExplorer()">↺ Reset</button>
+            <span class="qe-status" id="qe-status"></span>
+          </div>
+
+          <!-- Results -->
+          <div class="qe-results" id="qe-results" style="display:none">
+            <div class="qe-results-header">
+              <h4 id="qe-results-title">Results</h4>
+            </div>
+            <div class="table-wrap" id="qe-results-table"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Incidents Panel ───────────────────────────── -->
+    <div class="panel" id="panel-incidents">
+      <div class="stats-row" id="incident-stats"></div>
+      <div class="form-row mb-16">
+        <div class="form-group">
+          <label>Incident Type</label>
+          <select id="inc-filter-type" onchange="loadIncidents()">
+            <option value="">All Types</option>
+            <option value="failedJob">Failed Job</option>
+            <option value="failedExternalTask">Failed External Task</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Process Definition</label>
+          <select id="inc-filter-procdef" onchange="loadIncidents()">
+            <option value="">All Processes</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Process Instance ID</label>
+          <input type="text" id="inc-filter-pi" placeholder="Filter by instance…" />
+        </div>
+        <div class="form-group" style="justify-content:flex-end">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" onclick="loadIncidents()">Search</button>
+        </div>
+      </div>
+
+      <!-- Batch Action Bar -->
+      <div class="batch-bar" id="batch-bar">
+        <span class="batch-count"><span id="batch-selected-count">0</span> selected</span>
+        <div class="batch-actions">
+          <button class="btn btn-success btn-sm" onclick="batchRetry()">↻ Retry Selected</button>
+          <button class="btn btn-primary btn-sm" onclick="batchModifyToStart()">🔄 Modify</button>
+        </div>
+        <div class="batch-config">
+          <label>Batch size:</label>
+          <input type="number" id="batch-size" value="10" min="1" max="100" />
+          <button class="btn btn-outline btn-sm" onclick="selectAllIncidents()">Select All</button>
+          <button class="btn btn-outline btn-sm" onclick="deselectAllIncidents()">Deselect</button>
+        </div>
+      </div>
+
+      <div class="table-wrap" id="incidents-table"></div>
+    </div>
+
+    <!-- ── Process Instances Panel ────────────────────── -->
+    <div class="panel" id="panel-instances">
+      <div class="form-row mb-16">
+        <div class="form-group">
+          <label>Def Key</label>
+          <input type="text" id="pi-filter-key" placeholder="Process definition key…" />
+        </div>
+        <div class="form-group">
+          <label>Business Key</label>
+          <input type="text" id="pi-filter-bk" placeholder="Business key…" />
+        </div>
+        <div class="form-group">
+          <label>State</label>
+          <select id="pi-filter-state">
+            <option value="">All</option>
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+            <option value="withIncident">With Incidents</option>
+          </select>
+        </div>
+        <div class="form-group" style="justify-content:flex-end">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" onclick="loadInstances()">Search</button>
+        </div>
+      </div>
+      <div class="table-wrap" id="instances-table"></div>
+    </div>
+
+    <!-- ── Jobs Panel ────────────────────────────────── -->
+    <div class="panel" id="panel-jobs">
+      <div class="form-row mb-16">
+        <div class="form-group">
+          <label>Filter</label>
+          <select id="job-filter" onchange="loadJobs()">
+            <option value="">All Jobs</option>
+            <option value="noRetries" selected>Failed (0 retries)</option>
+            <option value="withException">With Exception</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Process Instance</label>
+          <input type="text" id="job-filter-pi" placeholder="Filter by instance…" />
+        </div>
+        <div class="form-group" style="justify-content:flex-end">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" onclick="loadJobs()">Search</button>
+        </div>
+      </div>
+      <div class="table-wrap" id="jobs-table"></div>
+    </div>
+
+    <!-- ── DMN Panel ─────────────────────────────────── -->
+    <div class="panel" id="panel-dmn">
+      <div class="section-title">Evaluate DMN Decision</div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1;position:relative">
+          <label>Decision Key</label>
+          <input type="text" id="dmn-search" placeholder="Type to search decisions…" autocomplete="off"
+            oninput="filterDmnList()" onfocus="showDmnDropdown()" />
+          <input type="hidden" id="dmn-key" />
+          <div id="dmn-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;max-height:280px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-top:4px;box-shadow:var(--shadow-lg)"></div>
+        </div>
+      </div>
+      <div id="dmn-info" class="mb-16" style="display:none">
+        <div class="kv-grid mb-16" id="dmn-info-grid"></div>
+      </div>
+      <div id="dmn-inputs-section" style="display:none" class="mb-16">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+          <label style="margin:0;font-weight:600">Input Variables</label>
+          <span id="dmn-hit-policy" class="tag tag-blue" style="font-size:11px"></span>
+        </div>
+        <div id="dmn-input-fields" class="mb-16" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <label style="margin:0;font-size:12px;color:var(--text3)">JSON Payload (auto-generated, editable)</label>
+          <button class="btn btn-outline btn-sm" style="font-size:11px;padding:2px 8px" onclick="regenerateDmnPayload()">🔄 Regenerate from fields</button>
+        </div>
+        <textarea id="dmn-variables" style="width:100%;min-height:100px;font-family:var(--mono);font-size:12.5px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;color:var(--text);resize:vertical;outline:none;line-height:1.6;transition:border-color var(--transition),box-shadow var(--transition)" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px var(--primary-glow)'" onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'" placeholder='Loading…'></textarea>
+      </div>
+      <div id="dmn-outputs-section" style="display:none" class="mb-16">
+        <label style="font-size:12px;color:var(--text3);margin-bottom:4px;display:block">Output Columns</label>
+        <div id="dmn-output-tags" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
+      <div class="btn-group mb-16">
+        <button class="btn btn-primary" onclick="evaluateDmn()">▶ Evaluate Decision</button>
+        <button class="btn btn-outline" onclick="loadDmnXml()">View DMN XML</button>
+      </div>
+      <div id="dmn-result"></div>
+    </div>
+
+    <!-- ── Process Definitions Panel ──────────────────── -->
+    <div class="panel" id="panel-definitions">
+      <div class="table-wrap" id="definitions-table"></div>
+    </div>
+
+    <!-- ── Deployments Panel ──────────────────────────── -->
+    <div class="panel" id="panel-deployments">
+      <div class="table-wrap" id="deployments-table"></div>
+    </div>
+
+    <!-- ── Tasks Panel ────────────────────────────────── -->
+    <div class="panel" id="panel-tasks">
+      <div class="form-row mb-16">
+        <div class="form-group">
+          <label>Assignee</label>
+          <input type="text" id="task-filter-assignee" placeholder="Filter by assignee…" />
+        </div>
+        <div class="form-group">
+          <label>State</label>
+          <select id="task-filter-state">
+            <option value="">All</option>
+            <option value="unassigned">Unassigned</option>
+          </select>
+        </div>
+        <div class="form-group" style="justify-content:flex-end">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" onclick="loadTasks()">Search</button>
+        </div>
+      </div>
+      <div class="table-wrap" id="tasks-table"></div>
+    </div>
+
+    <!-- ── Maintenance Panel ─────────────────────────────── -->
+    <div class="panel" id="panel-maintenance">
+      <h2 style="font-size:18px;margin-bottom:6px;font-weight:700;letter-spacing:-.2px">🧹 Maintenance &amp; Cleanup</h2>
+      <p style="color:var(--text3);font-size:13px;margin-bottom:20px;line-height:1.6">Housekeeping tools for resolving, de-duplicating, and cleaning up incidents.</p>
+
+      <div class="maint-cards">
+        <!-- Remove Duplicates Card -->
+        <div class="maint-card">
+          <h4>🔍 Find &amp; Remove Duplicates</h4>
+          <p>Scans all incidents and groups them by process definition + activity + type. Keeps the newest incident in each group and lets you remove duplicates in batch.</p>
+          <div class="maint-stat" id="dup-stats" style="display:none">
+            <div class="maint-stat-item"><div class="stat-value" id="dup-total-incidents">0</div><div class="stat-label">Total Incidents</div></div>
+            <div class="maint-stat-item"><div class="stat-value" id="dup-total-duplicates" style="color:var(--red)">0</div><div class="stat-label">Duplicates Found</div></div>
+            <div class="maint-stat-item"><div class="stat-value" id="dup-total-groups">0</div><div class="stat-label">Groups</div></div>
+          </div>
+          <div id="dup-groups-list" style="max-height:350px;overflow-y:auto;margin-bottom:12px"></div>
+          <div class="btn-group" style="gap:8px">
+            <button class="btn btn-primary" onclick="scanDuplicates()">🔍 Scan for Duplicates</button>
+            <button class="btn btn-danger" id="dup-remove-all-btn" onclick="removeAllDuplicates()" style="display:none">🗑️ Remove All Duplicates</button>
+          </div>
+        </div>
+
+        <!-- Batch Resolve Card -->
+        <div class="maint-card">
+          <h4>✕ Batch Resolve Incidents</h4>
+          <p>Resolve incidents by criteria. In Camunda 7, incidents are resolved by <strong>retrying</strong> the failed job/task (sets retries=1) or by <strong>deleting</strong> the process instance entirely.</p>
+          <div class="form-row mb-16">
+            <div class="form-group" style="flex:1">
+              <label>Incident Type</label>
+              <select id="maint-resolve-type">
+                <option value="">All Types</option>
+                <option value="failedJob">Failed Job</option>
+                <option value="failedExternalTask">Failed External Task</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex:1">
+              <label>Process Definition Key</label>
+              <input type="text" id="maint-resolve-key" placeholder="e.g. my-process" />
+            </div>
+          </div>
+          <div class="form-row mb-16">
+            <div class="form-group" style="flex:1">
+              <label>Strategy</label>
+              <select id="maint-resolve-strategy">
+                <option value="retry">↻ Retry (set retries=1, engine re-attempts)</option>
+                <option value="delete">🗑️ Delete Process Instance (destructive cleanup)</option>
+              </select>
+            </div>
+          </div>
+          <div class="maint-stat" id="resolve-preview-stats" style="display:none">
+            <div class="maint-stat-item"><div class="stat-value" id="resolve-preview-count" style="color:var(--red)">0</div><div class="stat-label">Incidents Matching</div></div>
+            <div class="maint-stat-item"><div class="stat-value" id="resolve-preview-orphans" style="color:var(--orange)">0</div><div class="stat-label">Orphaned (no PI)</div></div>
+          </div>
+          <div class="btn-group" style="gap:8px">
+            <button class="btn btn-outline" onclick="previewResolve()">Preview</button>
+            <button class="btn btn-danger" id="maint-resolve-btn" onclick="executeBatchResolve()" style="display:none">Execute</button>
+          </div>
+          <div id="resolve-result-log" class="maint-result-log"></div>
+        </div>
+
+        <!-- Cleanup Stale Card -->
+        <div class="maint-card">
+          <h4>🕒 Stale Incident Report</h4>
+          <p>Find incidents older than a given number of days. Useful for identifying stuck processes that may need manual intervention or cleanup.</p>
+          <div class="form-row mb-16">
+            <div class="form-group" style="flex:1">
+              <label>Older than (days)</label>
+              <input type="number" id="maint-stale-days" value="30" min="1" />
+            </div>
+          </div>
+          <div class="maint-stat" id="stale-stats" style="display:none">
+            <div class="maint-stat-item"><div class="stat-value" id="stale-count" style="color:var(--orange)">0</div><div class="stat-label">Stale Incidents</div></div>
+          </div>
+          <div id="stale-list" style="max-height:300px;overflow-y:auto;margin-bottom:12px"></div>
+          <div class="btn-group" style="gap:8px">
+            <button class="btn btn-outline" onclick="findStaleIncidents()">🔍 Find Stale Incidents</button>
+            <button class="btn btn-danger" id="stale-resolve-btn" onclick="resolveStaleIncidents()" style="display:none">🗑️ Resolve All Stale</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── History Panel ──────────────────────────────── -->
+    <div class="panel" id="panel-history">
+      <div class="form-row mb-16">
+        <div class="form-group">
+          <label>Process Instance ID</label>
+          <input type="text" id="hist-filter-pi" placeholder="Instance ID…" />
+        </div>
+        <div class="form-group">
+          <label>State</label>
+          <select id="hist-filter-state">
+            <option value="">All</option>
+            <option value="finished">Finished</option>
+            <option value="unfinished">Running</option>
+          </select>
+        </div>
+        <div class="form-group" style="justify-content:flex-end">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" onclick="loadHistory()">Search</button>
+        </div>
+      </div>
+      <div class="table-wrap" id="history-table"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ Detail Slide-over Panel ══════════════════════════════════ -->
+<div class="detail-overlay" id="detail-panel">
+  <div class="detail-header">
+    <h3 id="detail-title">Details</h3>
+    <button class="detail-close" onclick="closeDetail()">✕</button>
+  </div>
+  <div class="detail-body" id="detail-body"></div>
+</div>
+
+<!-- ═══ Progress Overlay ═════════════════════════════════════════ -->
+<div class="progress-overlay" id="progress-overlay">
+  <div class="progress-box">
+    <h3 id="progress-title">Processing…</h3>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progress-bar" style="width:0%"></div>
+    </div>
+    <div class="progress-status" id="progress-status">0 / 0</div>
+    <div class="progress-detail" id="progress-detail"></div>
+    <div class="progress-results" id="progress-results" style="display:none"></div>
+    <div class="btn-group" style="justify-content:center;margin-top:16px">
+      <button class="btn btn-outline" id="progress-close-btn" onclick="closeProgress()" style="display:none">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Modify Dialog ═══════════════════════════════════════════ -->
+<div class="modify-dialog-overlay" id="modify-dialog-overlay" onclick="if(event.target===this)closeModifyDialog()">
+  <div class="modify-dialog">
+    <h3 id="modify-dialog-title">🔄 Modify Incident</h3>
+    <div class="modify-subtitle" id="modify-dialog-subtitle">Select target activity to move the process instance to</div>
+    <div id="modify-dialog-info" class="modify-info"></div>
+    <div id="modify-dialog-body" class="modify-target-section">
+      <div class="modify-loading">Loading BPMN activities…</div>
+    </div>
+    <div class="modify-actions">
+      <button class="btn btn-outline" onclick="closeModifyDialog()">Cancel</button>
+      <button class="btn btn-primary" id="modify-dialog-confirm" onclick="confirmModify()" disabled>🔄 Modify</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Toast Container ══════════════════════════════════════════ -->
+<div class="toast-container" id="toasts"></div>
+
+<!-- ═══ Application Entry Point (ES Modules) ═════════════════════ -->
+<script type="module" src="/js/app.js"></script>
+
+</body>
+</html>

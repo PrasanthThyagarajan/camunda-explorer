@@ -1,0 +1,42 @@
+{
+  "name": "camunda-mcp-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MCP Server for Camunda Platform v7.16.0 — Analyse incidents, retry/modify instances, evaluate DMN, and more.",
+  "main": "dist/index.js",
+  "bin": {
+    "camunda-mcp-server": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "dev:run": "tsx src/index.ts",
+    "inspector": "mcp-inspector node dist/index.js",
+    "inspector:dev": "mcp-inspector tsx src/index.ts",
+    "dashboard": "tsx src/dashboard/server.ts",
+    "dashboard:build": "tsc && node dist/dashboard/server.js",
+    "lint": "eslint src/",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "axios": "^1.7.9",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.7",
+    "express": "^4.22.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/inspector": "^0.21.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.25",
+    "@types/node": "^22.13.0",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
