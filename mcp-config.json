@@ -2,11 +2,11 @@
   "mcpServers": {
     "camunda": {
       "command": "node",
-      "args": ["<PATH_TO_PROJECT>/dist/index.js"],
+      "args": ["D:/Repostory/AgenticRepo/camunda-mcp-server/dist/index.js"],
       "env": {
         "CAMUNDA_BASE_URL": "http://localhost:8080/engine-rest",
-        "CAMUNDA_USERNAME": "your-username",
-        "CAMUNDA_PASSWORD": "your-password",
+        "CAMUNDA_USERNAME": "demo",
+        "CAMUNDA_PASSWORD": "demo",
         "LOG_LEVEL": "info"
       }
     }
