@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Camunda Dashboard — v7.16.0</title>
+  <title>Camunda Explorer — v7.16.0</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </head>
 <body>
@@ -11,7 +11,7 @@
 <!-- ═══ Sidebar ══════════════════════════════════════════════════ -->
 <div class="sidebar">
   <div class="sidebar-brand">
-    <h1>🔧 Camunda Dashboard</h1>
+    <h1>🔧 Camunda Explorer</h1>
     <small>Platform v7.16.0</small>
   </div>
 
@@ -265,7 +265,7 @@
         <span class="batch-count"><span id="batch-selected-count">0</span> selected</span>
         <div class="batch-actions">
           <button class="btn btn-success btn-sm" onclick="batchRetry()">↻ Retry Selected</button>
-          <button class="btn btn-primary btn-sm" onclick="batchModifyToStart()">🔄 Modify</button>
+          <button class="btn btn-primary btn-sm" onclick="batchModifyToStart()">⇄ Modify</button>
         </div>
         <div class="batch-config">
           <label>Batch size:</label>
@@ -535,7 +535,7 @@
 <!-- ═══ Modify Dialog ═══════════════════════════════════════════ -->
 <div class="modify-dialog-overlay" id="modify-dialog-overlay" onclick="if(event.target===this)closeModifyDialog()">
   <div class="modify-dialog">
-    <h3 id="modify-dialog-title">🔄 Modify Incident</h3>
+    <h3 id="modify-dialog-title">⇄ Modify Incident</h3>
     <div class="modify-subtitle" id="modify-dialog-subtitle">Select target activity to move the process instance to</div>
     <div id="modify-dialog-info" class="modify-info"></div>
     <div id="modify-dialog-body" class="modify-target-section">
@@ -543,7 +543,33 @@
     </div>
     <div class="modify-actions">
       <button class="btn btn-outline" onclick="closeModifyDialog()">Cancel</button>
-      <button class="btn btn-primary" id="modify-dialog-confirm" onclick="confirmModify()" disabled>🔄 Modify</button>
+      <button class="btn btn-primary" id="modify-dialog-confirm" onclick="confirmModify()" disabled>⇄ Modify</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Start Instance Dialog ═══════════════════════════════════ -->
+<div class="start-dialog-overlay" id="start-dialog-overlay" onclick="if(event.target===this)closeStartDialog()">
+  <div class="start-dialog">
+    <h3 id="start-dialog-title">▶ Start Process Instance</h3>
+    <div class="start-subtitle" id="start-dialog-subtitle">Loading process definition…</div>
+    <div id="start-dialog-info" class="start-info"></div>
+    <div id="start-dialog-fields" class="start-fields-section"></div>
+    <div class="start-payload-section">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <label style="margin:0;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Variables JSON</label>
+        <span style="font-size:10px;color:var(--text3)">(auto-generated, editable)</span>
+        <button class="btn btn-outline btn-sm" style="font-size:10px;padding:2px 8px;margin-left:auto" onclick="regenerateStartPayload()">↻ Regenerate</button>
+      </div>
+      <textarea id="start-dialog-payload" spellcheck="false" style="width:100%;min-height:120px;font-family:var(--mono);font-size:12.5px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;color:var(--text);resize:vertical;outline:none;line-height:1.6;transition:border-color var(--transition),box-shadow var(--transition)" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px var(--primary-glow)'" onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'" placeholder='{ }'></textarea>
+    </div>
+    <div class="form-group" style="margin-top:12px">
+      <label>Business Key (optional)</label>
+      <input type="text" id="start-dialog-bkey" placeholder="e.g. ORDER-12345" style="min-width:100%" />
+    </div>
+    <div class="start-actions">
+      <button class="btn btn-outline" onclick="closeStartDialog()">Cancel</button>
+      <button class="btn btn-primary" id="start-dialog-confirm" onclick="confirmStartInstance()">▶ Start Instance</button>
     </div>
   </div>
 </div>

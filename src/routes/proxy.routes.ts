@@ -1,10 +1,3 @@
-/**
- * API Proxy Routes — Presentation layer.
- *
- * Forwards /api/* requests to the active Camunda REST API.
- * SRP: Sole responsibility is proxying HTTP requests.
- */
-
 import { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
 import { buildCamundaClient } from "../services/camunda-client.factory.js";

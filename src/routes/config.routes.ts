@@ -1,10 +1,3 @@
-/**
- * Config Routes — Presentation layer.
- *
- * Exposes read-only configuration information to the frontend.
- * SRP: Sole responsibility is configuration queries.
- */
-
 import { Router } from "express";
 import type { EnvironmentService } from "../services/environment.service.js";
 

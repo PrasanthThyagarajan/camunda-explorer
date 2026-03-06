@@ -1,15 +1,7 @@
-/**
- * Process Instances Panel — Presentation layer.
- *
- * SRP: Listing, filtering, detail view, suspend/modify/delete.
- */
-
 import { api } from '../api-client.js';
 import { esc, shortId, fmtDate, copyBtn, buildTable, toast } from '../utils.js';
 import { panelLoaders } from '../state.js';
 import { openDetail, closeDetail } from '../detail-panel.js';
-
-// ── Load Instances ──────────────────────────────────────────────────
 
 export async function loadInstances() {
   try {
@@ -38,8 +30,6 @@ export async function loadInstances() {
     document.getElementById('instances-table').innerHTML = buildTable(cols, data, actions);
   } catch (e) { document.getElementById('instances-table').innerHTML = `<div class="error-box">${e.message}</div>`; }
 }
-
-// ── Instance Detail ─────────────────────────────────────────────────
 
 export async function showInstanceDetail(id) {
   try {
@@ -76,8 +66,6 @@ export async function showInstanceDetail(id) {
   } catch (e) { toast('Failed: ' + e.message, 'error'); }
 }
 
-// ── Instance Actions ────────────────────────────────────────────────
-
 export async function modifyInstance(id) {
   const cancelActivity = document.getElementById('mod-cancel').value.trim();
   const startActivity = document.getElementById('mod-start').value.trim();
@@ -88,7 +76,7 @@ export async function modifyInstance(id) {
   try {
     await api(`/process-instance/${id}/modification`, {
       method: 'POST',
-      body: { skipCustomListeners: false, skipIoMappings: false, instructions, annotation: 'Modified via Camunda Dashboard' }
+      body: { skipCustomListeners: false, skipIoMappings: false, instructions, annotation: 'Modified via Camunda Explorer' }
     });
     toast('Instance modified successfully!', 'success');
     closeDetail();
@@ -114,5 +102,4 @@ export async function deleteInstance(id) {
   } catch (e) { toast('Failed: ' + e.message, 'error'); }
 }
 
-// Register in panel loader registry
 panelLoaders.instances = loadInstances;

@@ -1,15 +1,7 @@
-/**
- * Jobs Panel — Presentation layer.
- *
- * SRP: Job listing, filtering, retry, detail view.
- */
-
 import { api } from '../api-client.js';
 import { esc, shortId, shortMsg, fmtDate, copyBtn, buildTable, toast } from '../utils.js';
 import { panelLoaders } from '../state.js';
 import { openDetail } from '../detail-panel.js';
-
-// ── Load Jobs ───────────────────────────────────────────────────────
 
 export async function loadJobs() {
   try {
@@ -36,8 +28,6 @@ export async function loadJobs() {
     document.getElementById('jobs-table').innerHTML = buildTable(cols, data, actions);
   } catch (e) { document.getElementById('jobs-table').innerHTML = `<div class="error-box">${e.message}</div>`; }
 }
-
-// ── Job Actions ─────────────────────────────────────────────────────
 
 export async function retryJob(jobId) {
   try {
@@ -97,5 +87,4 @@ export async function executeJob(id) {
   } catch (e) { toast('Failed: ' + e.message, 'error'); }
 }
 
-// Register in panel loader registry
 panelLoaders.jobs = loadJobs;

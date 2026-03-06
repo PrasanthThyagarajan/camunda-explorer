@@ -1,16 +1,6 @@
-/**
- * Incident Service — Application layer.
- *
- * Business logic for incident batch operations: modify, resolve, retry, duplicates.
- * SRP: Sole responsibility is incident-related batch operations.
- * OCP: New strategies can be added without modifying existing ones.
- */
-
 import { AxiosInstance } from "axios";
 import { parseFirstActivity } from "../parsers/bpmn-parser.js";
 import { DEFAULT_BATCH_SIZE, DEFAULT_RETRY_COUNT, MAX_INCIDENTS_FETCH } from "../constants.js";
-
-// ── Result types ────────────────────────────────────────────────────
 
 export interface BatchResult {
   incidentId: string;
@@ -41,13 +31,7 @@ export interface DuplicateScanResult {
   groups: DuplicateGroup[];
 }
 
-// ── Service ─────────────────────────────────────────────────────────
-
 export class IncidentService {
-  /**
-   * Batch modify incidents — move each process instance to a target activity.
-   * If targetActivityId is not given, auto-detects the first activity from BPMN.
-   */
   async batchModifyToStart(
     client: AxiosInstance,
     incidentIds: string[],
@@ -70,9 +54,6 @@ export class IncidentService {
     return this.summarize(results);
   }
 
-  /**
-   * Batch resolve incidents using type-appropriate strategies.
-   */
   async batchResolve(
     client: AxiosInstance,
     incidentIds: string[],
@@ -92,9 +73,6 @@ export class IncidentService {
     return this.summarize(results);
   }
 
-  /**
-   * Batch retry incidents — set job retries.
-   */
   async batchRetry(
     client: AxiosInstance,
     incidentIds: string[],
@@ -109,12 +87,33 @@ export class IncidentService {
         batch.map(async (incidentId) => {
           try {
             const incRes = await client.get(`/incident/${incidentId}`);
-            const jobId = incRes.data.configuration;
-            if (!jobId) {
-              return { incidentId, status: "error" as const, message: "No associated job" };
+            const { incidentType, configuration } = incRes.data;
+
+            if (!configuration) {
+              return { incidentId, status: "error" as const, message: "No associated job/task (configuration is empty)" };
             }
-            await client.put(`/job/${jobId}/retries`, { retries });
-            return { incidentId, status: "success" as const, message: `Retries set to ${retries}` };
+
+            if (incidentType === "failedExternalTask") {
+              await client.put(`/external-task/${configuration}/retries`, { retries });
+              return { incidentId, status: "success" as const, message: `External task retries set to ${retries}` };
+            }
+
+            if (incidentType === "failedJob") {
+              await client.put(`/job/${configuration}/retries`, { retries });
+              return { incidentId, status: "success" as const, message: `Job retries set to ${retries}` };
+            }
+
+            try {
+              await client.put(`/job/${configuration}/retries`, { retries });
+              return { incidentId, status: "success" as const, message: `Retries set to ${retries}` };
+            } catch {
+              try {
+                await client.put(`/external-task/${configuration}/retries`, { retries });
+                return { incidentId, status: "success" as const, message: `External task retries set to ${retries}` };
+              } catch (fallbackErr: unknown) {
+                return { incidentId, status: "error" as const, message: `Unsupported type (${incidentType}): ${this.extractErrorMessage(fallbackErr)}` };
+              }
+            }
           } catch (error: unknown) {
             return { incidentId, status: "error" as const, message: this.extractErrorMessage(error) };
           }
@@ -126,9 +125,6 @@ export class IncidentService {
     return this.summarize(results);
   }
 
-  /**
-   * Find duplicate incidents (same processDefinitionId + activityId + incidentType).
-   */
   async findDuplicates(client: AxiosInstance): Promise<DuplicateScanResult> {
     const incRes = await client.get("/incident", { params: { maxResults: MAX_INCIDENTS_FETCH } });
     const incidents: Array<Record<string, unknown>> = incRes.data;
@@ -164,8 +160,6 @@ export class IncidentService {
     return { totalIncidents: incidents.length, totalDuplicates, groups: duplicateGroups };
   }
 
-  // ── Private: single incident operations ───────────────────────────
-
   private async modifySingleIncident(
     client: AxiosInstance,
     incidentId: string,
@@ -181,7 +175,6 @@ export class IncidentService {
         return { incidentId, status: "error", message: "Missing processInstanceId or processDefinitionId" };
       }
 
-      // Determine target activity
       let moveToId = targetActivityId || null;
       if (!moveToId) {
         if (!(processDefinitionId in firstActivityCache)) {
@@ -204,7 +197,6 @@ export class IncidentService {
         return { incidentId, processInstanceId, status: "error", message: `Already at target activity (${moveToId})` };
       }
 
-      // Execute modification
       await client.post(`/process-instance/${processInstanceId}/modification`, {
         skipCustomListeners: false,
         skipIoMappings: false,
@@ -212,10 +204,9 @@ export class IncidentService {
           { type: "cancel", activityId, cancelCurrentActiveActivityInstances: true },
           { type: "startBeforeActivity", activityId: moveToId },
         ],
-        annotation: `Batch modified via Camunda Dashboard: moved from ${activityId} → ${moveToId}`,
+        annotation: `Batch modified via Camunda Explorer: moved from ${activityId} → ${moveToId}`,
       });
 
-      // Cleanup incident
       await this.cleanupIncidentAfterModify(client, incidentId, incident);
 
       return {
@@ -235,10 +226,8 @@ export class IncidentService {
     incident: Record<string, unknown>
   ): Promise<void> {
     try {
-      // Check if incident still exists
       await client.get(`/incident/${incidentId}`);
 
-      // Still exists — try cleanup based on type
       if (incident.incidentType === "failedExternalTask" && incident.configuration) {
         try {
           await client.put(`/external-task/${incident.configuration}/retries`, { retries: 1 });
@@ -253,10 +242,9 @@ export class IncidentService {
         } catch { /* fall through */ }
       }
 
-      // Last resort: try DELETE
       try { await client.delete(`/incident/${incidentId}`); } catch { /* ignored */ }
     } catch {
-      // 404 = incident already gone (auto-resolved) — perfect
+      // incident already gone (auto-resolved by modification)
     }
   }
 
@@ -270,7 +258,6 @@ export class IncidentService {
       const inc = incRes.data;
       const { incidentType, processInstanceId, configuration } = inc;
 
-      // Strategy: delete process instance (destructive)
       if (strategy === "delete" && processInstanceId) {
         await client.delete(`/process-instance/${processInstanceId}`, {
           params: { skipCustomListeners: true, skipIoMappings: true },
@@ -278,7 +265,6 @@ export class IncidentService {
         return { incidentId, status: "success", message: `Process instance ${processInstanceId} deleted` };
       }
 
-      // Strategy: retry
       if (incidentType === "failedExternalTask" && configuration) {
         await client.put(`/external-task/${configuration}/retries`, { retries: 1 });
         return { incidentId, status: "success", message: "External task retries set to 1" };
@@ -303,7 +289,6 @@ export class IncidentService {
         }
       }
 
-      // Unknown type — try DELETE as fallback
       try {
         await client.delete(`/incident/${incidentId}`);
         return { incidentId, status: "success", message: "Resolved via DELETE" };
@@ -318,8 +303,6 @@ export class IncidentService {
       return { incidentId, status: "error", message: this.extractErrorMessage(error) };
     }
   }
-
-  // ── Private helpers ───────────────────────────────────────────────
 
   private summarize(results: BatchResult[]): BatchSummary {
     return {

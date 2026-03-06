@@ -1,9 +1,3 @@
-/**
- * History Panel — Presentation layer.
- *
- * SRP: Listing and filtering historical process instances.
- */
-
 import { api } from '../api-client.js';
 import { shortId, fmtDate, buildTable } from '../utils.js';
 import { panelLoaders } from '../state.js';

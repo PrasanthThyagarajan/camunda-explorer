@@ -1,10 +1,3 @@
-/**
- * MCP Tools — DMN / Decision Definition
- *
- * Camunda 7.16 REST API: /decision-definition
- * Tools for listing, inspecting, and evaluating DMN decision tables.
- */
-
 import { z } from "zod";
 import { IToolModule } from "../interfaces/index.js";
 import { cleanParams } from "../utils/clean-params.js";
@@ -17,9 +10,7 @@ import {
 export const decisionDefinitionTools: IToolModule = {
   name: "Decision Definition (DMN) tools",
 
-  register(server, client) {
-    // ── List Decision Definitions ───────────────────────────────────────
-    server.tool(
+  register(server, client) {    server.tool(
       "camunda_list_decision_definitions",
       "List all deployed DMN decision definitions. Use this to discover available DMN tables before evaluation.",
       {
@@ -72,10 +63,7 @@ export const decisionDefinitionTools: IToolModule = {
         ]);
         return formatResponse(data, summary);
       })
-    );
-
-    // ── Get Decision Definition by ID ───────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_decision_definition",
       "Get a decision definition by its deployment ID.",
       {
@@ -87,10 +75,7 @@ export const decisionDefinitionTools: IToolModule = {
         );
         return formatResponse(response.data);
       })
-    );
-
-    // ── Get Decision Definition by Key ──────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_decision_definition_by_key",
       "Get the latest version of a decision definition by its key.",
       {
@@ -102,10 +87,7 @@ export const decisionDefinitionTools: IToolModule = {
         );
         return formatResponse(response.data);
       })
-    );
-
-    // ── Evaluate Decision by Key (PRIMARY DMN TOOL) ─────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_evaluate_decision_by_key",
       `Evaluate a DMN decision table by its key with input variables.
 The variables object should be keyed by variable name, each with { value, type }.
@@ -137,10 +119,7 @@ Example input: { "amount": { "value": 600, "type": "Double" }, "category": { "va
           `DMN '${decisionKey}' evaluated — ${Array.isArray(results) ? results.length : 0} rule(s) matched.`
         );
       })
-    );
-
-    // ── Evaluate Decision by ID ─────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_evaluate_decision_by_id",
       "Evaluate a DMN decision table by its deployment ID. Use when you need a specific version rather than the latest.",
       {
@@ -164,10 +143,7 @@ Example input: { "amount": { "value": 600, "type": "Double" }, "category": { "va
           `DMN evaluated — ${Array.isArray(response.data) ? response.data.length : 0} rule(s) matched.`
         );
       })
-    );
-
-    // ── Evaluate Decision by Key + Tenant ───────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_evaluate_decision_by_key_tenant",
       "Evaluate a DMN decision table by key and tenant ID (for multi-tenant setups).",
       {
@@ -189,10 +165,7 @@ Example input: { "amount": { "value": 600, "type": "Double" }, "category": { "va
         );
         return formatResponse(response.data);
       })
-    );
-
-    // ── Get DMN XML by ID ───────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_decision_xml",
       "Get the DMN XML of a decision definition by ID. Useful for understanding inputs/outputs before evaluation.",
       {
@@ -204,10 +177,7 @@ Example input: { "amount": { "value": 600, "type": "Double" }, "category": { "va
         );
         return formatResponse(response.data);
       })
-    );
-
-    // ── Get DMN XML by Key ──────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_decision_xml_by_key",
       "Get the DMN XML of the latest version of a decision definition by its key.",
       {

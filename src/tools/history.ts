@@ -1,10 +1,3 @@
-/**
- * MCP Tools — History
- *
- * Camunda 7.16 REST API: /history
- * Tools for querying historical process instances, activities, variables, and incidents.
- */
-
 import { z } from "zod";
 import { IToolModule } from "../interfaces/index.js";
 import { cleanParams } from "../utils/clean-params.js";
@@ -17,9 +10,7 @@ import {
 export const historyTools: IToolModule = {
   name: "History tools",
 
-  register(server, client) {
-    // ── List Historic Process Instances ─────────────────────────────────
-    server.tool(
+  register(server, client) {    server.tool(
       "camunda_list_historic_process_instances",
       "List historic process instances (completed, cancelled, or still running).",
       {
@@ -72,10 +63,7 @@ export const historyTools: IToolModule = {
         ]);
         return formatResponse(data, summary);
       })
-    );
-
-    // ── Get Historic Process Instance ───────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_historic_process_instance",
       "Get a historic process instance by ID with all details.",
       {
@@ -87,10 +75,7 @@ export const historyTools: IToolModule = {
         );
         return formatResponse(response.data);
       })
-    );
-
-    // ── List Historic Activity Instances ────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_list_historic_activities",
       "List historic activity instances for audit trail. Shows which activities were executed and when.",
       {
@@ -136,10 +121,7 @@ export const historyTools: IToolModule = {
         ]);
         return formatResponse(data, summary);
       })
-    );
-
-    // ── List Historic Variable Instances ────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_list_historic_variables",
       "List historic variable instances. Useful for understanding what data flowed through a process.",
       {
@@ -169,10 +151,7 @@ export const historyTools: IToolModule = {
         ]);
         return formatResponse(data, summary);
       })
-    );
-
-    // ── List Historic Incidents ─────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_list_historic_incidents",
       "List historic incidents (both open and resolved). For full incident audit trail.",
       {
@@ -225,10 +204,7 @@ export const historyTools: IToolModule = {
         ]);
         return formatResponse(data, summary);
       })
-    );
-
-    // ── Delete Historic Process Instance ────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_delete_historic_process_instance",
       "Delete a historic process instance and all related history data. WARNING: Irreversible.",
       {

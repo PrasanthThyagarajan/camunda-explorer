@@ -1,22 +1,10 @@
-/**
- * Configuration module — reads environment variables for Camunda connection and server settings.
- * Copy `env.example` to `.env` and fill in your values.
- */
-
 export interface AppConfig {
-  /** Camunda REST API base URL, e.g. http://localhost:8080/engine-rest */
   camundaBaseUrl: string;
-  /** Basic auth username (optional) */
   camundaUsername?: string;
-  /** Basic auth password (optional) */
   camundaPassword?: string;
-  /** Bearer token auth (optional — alternative to basic auth) */
   camundaToken?: string;
-  /** HTTP request timeout in ms */
   requestTimeout: number;
-  /** Default max results for list queries */
   maxResultsDefault: number;
-  /** Log level */
   logLevel: string;
 }
 

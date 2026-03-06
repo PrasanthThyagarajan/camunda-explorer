@@ -1,16 +1,8 @@
-/**
- * Modify Dialog — Presentation component.
- *
- * SRP: The modify-incident dialog (single + batch mode).
- */
-
 import { api, rawApi } from '../api-client.js';
 import { esc, shortId, toast } from '../utils.js';
 import { state } from '../state.js';
 import { refreshCurrentPanel } from '../navigation.js';
 import { showProgress, updateProgress, finishProgress } from '../progress.js';
-
-// ── Open / Close ────────────────────────────────────────────────────
 
 export function openModifyDialog() {
   document.getElementById('modify-dialog-overlay').classList.add('visible');
@@ -24,8 +16,6 @@ export function closeModifyDialog() {
   };
 }
 
-// ── Select Target Activity ──────────────────────────────────────────
-
 export function selectModifyTarget(actId) {
   state.modifyDialog.selectedTargetId = actId;
   document.querySelectorAll('#modify-dialog-body .activity-item').forEach(el => {
@@ -35,8 +25,6 @@ export function selectModifyTarget(actId) {
   });
   document.getElementById('modify-dialog-confirm').disabled = false;
 }
-
-// ── Render Activity List ────────────────────────────────────────────
 
 function renderActivityList(activities, stuckActivityId) {
   if (!activities || activities.length === 0) {
@@ -61,15 +49,13 @@ function renderActivityList(activities, stuckActivityId) {
   return html;
 }
 
-// ── Single Modify ───────────────────────────────────────────────────
-
 export async function modifyIncidentToStart(incidentId) {
   state.modifyDialog = {
     mode: 'single', incidentIds: [incidentId], processDefinitionId: null,
     stuckActivityId: null, selectedTargetId: null, activities: [],
   };
 
-  document.getElementById('modify-dialog-title').textContent = '🔄 Modify Incident';
+  document.getElementById('modify-dialog-title').textContent = '⇄ Modify Incident';
   document.getElementById('modify-dialog-subtitle').textContent = 'Loading incident details…';
   document.getElementById('modify-dialog-info').innerHTML = '';
   document.getElementById('modify-dialog-body').innerHTML = '<div class="modify-loading">Loading BPMN activities…</div>';
@@ -99,10 +85,8 @@ export async function modifyIncidentToStart(incidentId) {
   }
 }
 
-// ── Batch Modify ────────────────────────────────────────────────────
-
 export async function batchModifyToStart() {
-  // Import here to avoid circular dependency
+  // Dynamic import to avoid circular dependency
   const { getSelectedIncidentIds } = await import('../panels/incidents.js');
   const ids = getSelectedIncidentIds();
   if (ids.length === 0) { toast('Select incidents first', 'error'); return; }
@@ -112,7 +96,7 @@ export async function batchModifyToStart() {
     stuckActivityId: null, selectedTargetId: null, activities: [],
   };
 
-  document.getElementById('modify-dialog-title').textContent = `🔄 Batch Modify (${ids.length} incidents)`;
+  document.getElementById('modify-dialog-title').textContent = `⇄ Batch Modify (${ids.length} incidents)`;
   document.getElementById('modify-dialog-subtitle').textContent = 'Loading process info from first selected incident…';
   document.getElementById('modify-dialog-info').innerHTML = '';
   document.getElementById('modify-dialog-body').innerHTML = '<div class="modify-loading">Loading BPMN activities…</div>';
@@ -141,8 +125,6 @@ export async function batchModifyToStart() {
     document.getElementById('modify-dialog-body').innerHTML = `<div class="error-box">Failed to load: ${esc(e.message)}</div>`;
   }
 }
-
-// ── Confirm Modify ──────────────────────────────────────────────────
 
 export async function confirmModify() {
   const { mode, incidentIds, selectedTargetId } = state.modifyDialog;

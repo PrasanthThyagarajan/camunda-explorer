@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Camunda Dashboard — Styles
+   Camunda Explorer — Styles
    Platform v7.16.0
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -273,6 +273,29 @@ a:hover { color: #60a5fa; text-decoration: underline; }
 .modify-dialog .activity-item .act-stuck { font-size: 10px; color: var(--red); font-weight: 700; background: rgba(239,68,68,.12); padding: 2px 8px; border-radius: var(--radius-sm); }
 .modify-dialog .modify-actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--border); }
 .modify-dialog .modify-loading { text-align: center; padding: 30px; color: var(--text3); }
+
+/* ── Start Instance Dialog ────────────────────────────────────────── */
+.start-dialog-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15,17,23,.88); z-index: 350; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+.start-dialog-overlay.visible { display: flex; animation: overlayIn .2s ease; }
+.start-dialog { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 28px 32px; width: 600px; max-width: 92vw; max-height: 85vh; display: flex; flex-direction: column; box-shadow: var(--shadow-lg); animation: scaleIn .25s ease; overflow-y: auto; }
+.start-dialog h3 { font-size: 17px; margin-bottom: 6px; font-weight: 700; }
+.start-dialog .start-subtitle { font-size: 12px; color: var(--text3); margin-bottom: 20px; }
+.start-dialog .start-info { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; margin-bottom: 20px; font-size: 13px; background: var(--bg); padding: 12px; border-radius: var(--radius); }
+.start-dialog .start-info .k { color: var(--text3); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
+.start-dialog .start-info .v { color: var(--text); }
+.start-dialog .start-fields-section { margin-bottom: 16px; }
+.start-dialog .start-fields-section .start-fields-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-top: 8px; }
+.start-dialog .start-field-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+.start-dialog .start-field-card .field-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.start-dialog .start-field-card .field-header .field-name { font-weight: 600; font-size: 13px; }
+.start-dialog .start-field-card .field-header .field-type { font-size: 10px; background: var(--surface2); padding: 2px 8px; border-radius: var(--radius-sm); color: var(--text3); }
+.start-dialog .start-field-card input,
+.start-dialog .start-field-card select { width: 100%; padding: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; outline: none; transition: border-color var(--transition), box-shadow var(--transition); }
+.start-dialog .start-field-card input:focus,
+.start-dialog .start-field-card select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+.start-dialog .start-payload-section { margin-bottom: 12px; }
+.start-dialog .start-actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--border); margin-top: 8px; }
+.start-dialog .start-no-fields { text-align: center; padding: 16px; color: var(--text3); font-size: 12px; background: var(--bg); border-radius: var(--radius); border: 1px dashed var(--border); }
 
 /* ── Checkbox styling ─────────────────────────────────────────────── */
 table input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); }

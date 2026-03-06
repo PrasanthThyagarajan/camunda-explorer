@@ -1,9 +1,3 @@
-/**
- * MCP Tools — Execution & Message Correlation
- *
- * Camunda 7.16 REST API: /execution, /message
- */
-
 import { z } from "zod";
 import { IToolModule } from "../interfaces/index.js";
 import { cleanParams } from "../utils/clean-params.js";
@@ -16,9 +10,7 @@ import {
 export const executionTools: IToolModule = {
   name: "Execution & Message tools",
 
-  register(server, client) {
-    // ── List Executions ─────────────────────────────────────────────────
-    server.tool(
+  register(server, client) {    server.tool(
       "camunda_list_executions",
       "List executions (tokens) with optional filters.",
       {
@@ -45,10 +37,7 @@ export const executionTools: IToolModule = {
         ]);
         return formatResponse(data, summary);
       })
-    );
-
-    // ── Get Execution ───────────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_execution",
       "Get an execution by ID.",
       {
@@ -58,10 +47,7 @@ export const executionTools: IToolModule = {
         const response = await client.get(`/execution/${executionId}`);
         return formatResponse(response.data);
       })
-    );
-
-    // ── Signal Execution ────────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_signal_execution",
       "Signal an execution that is waiting at a signal/receive event, causing it to continue.",
       {
@@ -82,10 +68,7 @@ export const executionTools: IToolModule = {
         await client.post(`/execution/${executionId}/signal`, body);
         return formatResponse(null, `Execution ${executionId} signalled.`);
       })
-    );
-
-    // ── Deliver Message ─────────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_deliver_message",
       "Correlate a message to a waiting process instance or start a new instance via message start event.",
       {

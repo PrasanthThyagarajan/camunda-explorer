@@ -1,21 +1,13 @@
 /**
- * App Entry Point — Bootstraps all modules and binds to the global scope.
- *
- * SRP: Only responsible for importing modules, binding window globals,
- *      and triggering the initial page load.
- *
- * Why window bindings?
- *   Inline `onclick` handlers in HTML need functions on the global scope.
- *   This is the ONLY file that touches `window.*` — all logic lives in modules.
+ * App Entry Point — imports all modules and binds them to window scope
+ * for inline onclick handlers in HTML.
  */
 
-// ── Core Modules ────────────────────────────────────────────────────
 import { switchPanel, refreshCurrentPanel } from './navigation.js';
 import { openDetail, closeDetail } from './detail-panel.js';
 import { showProgress, updateProgress, finishProgress, closeProgress } from './progress.js';
 import { copyVal, toast } from './utils.js';
 
-// ── Panel Modules (side-effect: each registers in panelLoaders) ─────
 import { loadHealth } from './panels/health.js';
 import {
   loadIncidents, retryIncident, showIncidentDetail,
@@ -53,17 +45,18 @@ import {
   findStaleIncidents, resolveStaleIncidents,
 } from './panels/maintenance.js';
 
-// ── Component Modules ───────────────────────────────────────────────
 import {
   closeModifyDialog, selectModifyTarget, modifyIncidentToStart,
   batchModifyToStart, confirmModify,
 } from './components/modify-dialog.js';
 import {
+  closeStartDialog, regenerateStartPayload, confirmStartInstance,
+} from './components/start-dialog.js';
+import {
   toggleQueryExplorer, onQeQuerySelect, executeQuery,
   copyQueryResults, resetQueryExplorer,
 } from './components/query-explorer.js';
 
-// ── Window Bindings ─────────────────────────────────────────────────
 // Navigation
 window.switchPanel = switchPanel;
 window.refreshCurrentPanel = refreshCurrentPanel;
@@ -158,6 +151,11 @@ window.modifyIncidentToStart = modifyIncidentToStart;
 window.batchModifyToStart = batchModifyToStart;
 window.confirmModify = confirmModify;
 
+// Start Instance Dialog
+window.closeStartDialog = closeStartDialog;
+window.regenerateStartPayload = regenerateStartPayload;
+window.confirmStartInstance = confirmStartInstance;
+
 // Query Explorer
 window.toggleQueryExplorer = toggleQueryExplorer;
 window.onQeQuerySelect = onQeQuerySelect;
@@ -165,11 +163,7 @@ window.executeQuery = executeQuery;
 window.copyQueryResults = copyQueryResults;
 window.resetQueryExplorer = resetQueryExplorer;
 
-// ── Initialization ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  // Initialize DMN dropdown close behavior
   initDmnDropdownClose();
-
-  // Load the default panel (health)
   switchPanel('health');
 });

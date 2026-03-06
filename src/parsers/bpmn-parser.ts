@@ -1,24 +1,11 @@
-/**
- * BPMN XML Parser — pure functions, no side effects, no framework dependencies.
- *
- * Extracts structural information from BPMN 2.0 XML:
- *   - First executable activity after a start event
- *   - All activities in flow order (BFS traversal)
- *
- * SRP: This module's sole responsibility is BPMN XML analysis.
- */
-
 import {
   MAX_GATEWAY_TRAVERSAL_HOPS,
   BPMN_ACTIVITY_TYPES,
   BPMN_GATEWAY_TYPES,
   BPMN_EVENT_TYPES,
 } from "../constants.js";
-import type { IBpmnFirstActivity, IBpmnActivity } from "../interfaces/parsers.js";
+import type { IBpmnFirstActivity, IBpmnActivity, IBpmnFormField, IBpmnStartFormResult } from "../interfaces/parsers.js";
 
-// ── Internal helpers ────────────────────────────────────────────────
-
-/** Find the targetRef of a sequence flow from a given sourceRef */
 function findTarget(bpmnXml: string, sourceId: string): string | null {
   const r1 = new RegExp(
     `<(?:bpmn2?:)?sequenceFlow[^>]+sourceRef="${sourceId}"[^>]+targetRef="([^"]+)"`
@@ -29,31 +16,22 @@ function findTarget(bpmnXml: string, sourceId: string): string | null {
   return bpmnXml.match(r1)?.[1] || bpmnXml.match(r2)?.[1] || null;
 }
 
-/** Check if an element ID is a gateway */
 function isGateway(bpmnXml: string, elementId: string): boolean {
   const r = new RegExp(`<(?:bpmn2?:)?\\w*[Gg]ateway[^>]+id="${elementId}"`);
   return r.test(bpmnXml);
 }
 
-/** Get the name attribute of an element by its ID */
 function getElementName(bpmnXml: string, elementId: string): string | null {
   const r1 = new RegExp(`<(?:bpmn2?:)?\\w+[^>]+id="${elementId}"[^>]*?name="([^"]*)"`);
   const r2 = new RegExp(`<(?:bpmn2?:)?\\w+[^>]+name="([^"]*)"[^>]*?id="${elementId}"`);
   return bpmnXml.match(r1)?.[1] || bpmnXml.match(r2)?.[1] || null;
 }
 
-/** Extract the start event ID from BPMN XML */
 function findStartEventId(bpmnXml: string): string | null {
   const match = bpmnXml.match(/<(?:bpmn2?:)?startEvent\s+[^>]*?id="([^"]+)"/);
   return match?.[1] || null;
 }
 
-// ── Public API ──────────────────────────────────────────────────────
-
-/**
- * Find the first executable activity after the start event.
- * Traverses past gateways (up to MAX_GATEWAY_TRAVERSAL_HOPS) to find an actual task/event.
- */
 export function parseFirstActivity(bpmnXml: string): IBpmnFirstActivity | null {
   const startEventId = findStartEventId(bpmnXml);
   if (!startEventId) return null;
@@ -76,15 +54,10 @@ export function parseFirstActivity(bpmnXml: string): IBpmnFirstActivity | null {
   return null;
 }
 
-/**
- * Extract ALL activities from BPMN XML in flow order (BFS from start event).
- * Activities not reachable from start are appended at the end.
- */
 export function parseAllActivities(bpmnXml: string): IBpmnActivity[] {
   const firstAct = parseFirstActivity(bpmnXml);
   const firstId = firstAct?.firstActivityId || null;
 
-  // 1. Build a map of all BPMN activity elements (id → { name, type })
   const elementMap: Record<string, { name: string; type: string }> = {};
   for (const elType of BPMN_ACTIVITY_TYPES) {
     const regex = new RegExp(`<(?:bpmn2?:)?${elType}\\s+([^>]*?)\\/?\\s*>`, "g");
@@ -102,7 +75,6 @@ export function parseAllActivities(bpmnXml: string): IBpmnActivity[] {
     }
   }
 
-  // 2. Build adjacency list from sequence flows
   const adjacency: Record<string, string[]> = {};
   const flowRegex = /<(?:bpmn2?:)?sequenceFlow\s+[^>]*?id="[^"]*"[^>]*>/g;
   let fm;
@@ -116,7 +88,6 @@ export function parseAllActivities(bpmnXml: string): IBpmnActivity[] {
     }
   }
 
-  // 3. Index all node IDs (for BFS traversal)
   const allNodeTypes = [
     ...BPMN_EVENT_TYPES,
     ...BPMN_GATEWAY_TYPES,
@@ -131,7 +102,6 @@ export function parseAllActivities(bpmnXml: string): IBpmnActivity[] {
     }
   }
 
-  // 4. BFS from startEvent to produce activities in flow order
   const startId = findStartEventId(bpmnXml);
   const orderedActivities: IBpmnActivity[] = [];
   const visited = new Set<string>();
@@ -164,7 +134,6 @@ export function parseAllActivities(bpmnXml: string): IBpmnActivity[] {
     }
   }
 
-  // 5. Append disconnected activities
   for (const [id, info] of Object.entries(elementMap)) {
     if (!visited.has(id)) {
       orderedActivities.push({
@@ -178,4 +147,98 @@ export function parseAllActivities(bpmnXml: string): IBpmnActivity[] {
   }
 
   return orderedActivities;
+}
+
+export function parseStartFormFields(bpmnXml: string): IBpmnStartFormResult {
+  const nameMatch = bpmnXml.match(/<(?:bpmn2?:)?process[^>]+name="([^"]+)"/);
+  const keyMatch = bpmnXml.match(/<(?:bpmn2?:)?process[^>]+id="([^"]+)"/);
+  const processName = nameMatch?.[1] || keyMatch?.[1] || "Unknown";
+  const processKey = keyMatch?.[1] || "";
+
+  const formFields: IBpmnFormField[] = [];
+
+  const startEventRegex = /<(?:bpmn2?:)?startEvent\s+[^>]*?id="[^"]*"[^>]*>([\s\S]*?)<\/(?:bpmn2?:)?startEvent>/;
+  const startEventMatch = bpmnXml.match(startEventRegex);
+
+  if (startEventMatch) {
+    const startEventBody = startEventMatch[1];
+
+    const formFieldRegex = /<camunda:formField\s+([^>]*?)(?:\/>|>([\s\S]*?)<\/camunda:formField>)/g;
+    let fieldMatch;
+    while ((fieldMatch = formFieldRegex.exec(startEventBody)) !== null) {
+      const attrs = fieldMatch[1];
+      const body = fieldMatch[2] || "";
+
+      const idMatch = attrs.match(/id="([^"]+)"/);
+      const labelMatch = attrs.match(/label="([^"]+)"/);
+      const typeMatch = attrs.match(/type="([^"]+)"/);
+      const defaultMatch = attrs.match(/defaultValue="([^"]*)"/);
+
+      const enumValues: Array<{ id: string; name: string }> = [];
+      if (typeMatch?.[1] === "enum") {
+        const valueRegex = /<camunda:value\s+([^>]*?)\/?>/g;
+        let valMatch;
+        while ((valMatch = valueRegex.exec(body)) !== null) {
+          const valAttrs = valMatch[1];
+          const valId = valAttrs.match(/id="([^"]+)"/);
+          const valName = valAttrs.match(/name="([^"]+)"/);
+          if (valId) {
+            enumValues.push({ id: valId[1], name: valName?.[1] || valId[1] });
+          }
+        }
+      }
+
+      formFields.push({
+        id: idMatch?.[1] || "",
+        label: labelMatch?.[1] || idMatch?.[1] || "field",
+        type: (typeMatch?.[1] || "string").toLowerCase(),
+        defaultValue: defaultMatch?.[1] || "",
+        enumValues,
+      });
+    }
+  }
+
+  const samplePayload: Record<string, unknown> = {};
+  for (const field of formFields) {
+    let value: unknown;
+    let type: string;
+
+    switch (field.type) {
+      case "long":
+      case "integer":
+        value = field.defaultValue ? parseInt(field.defaultValue) || 0 : 0;
+        type = field.type === "long" ? "Long" : "Integer";
+        break;
+      case "double":
+        value = field.defaultValue ? parseFloat(field.defaultValue) || 0.0 : 0.0;
+        type = "Double";
+        break;
+      case "boolean":
+        value = field.defaultValue === "true";
+        type = "Boolean";
+        break;
+      case "date":
+        value = field.defaultValue || "2026-01-01T00:00:00.000+0000";
+        type = "Date";
+        break;
+      case "enum":
+        value = field.defaultValue || (field.enumValues[0]?.id ?? "");
+        type = "String";
+        break;
+      default:
+        value = field.defaultValue || "";
+        type = "String";
+        break;
+    }
+
+    samplePayload[field.id] = { value, type };
+  }
+
+  return {
+    processDefinitionKey: processKey,
+    processDefinitionName: processName,
+    hasFormFields: formFields.length > 0,
+    formFields,
+    samplePayload,
+  };
 }

@@ -1,11 +1,3 @@
-/**
- * File-based Environment Repository — Infrastructure layer.
- *
- * Implements IEnvironmentRepository using JSON file persistence.
- * DIP: Services depend on the IEnvironmentRepository interface, not this class.
- * SRP: Sole responsibility is environment data persistence.
- */
-
 import fs from "fs";
 import path from "path";
 import type { ICamundaEnvironment, IEnvironmentRepository } from "../interfaces/environment.js";
@@ -19,8 +11,6 @@ export class EnvironmentRepository implements IEnvironmentRepository {
     this.filePath = path.resolve(baseDir, ENV_FILE_NAME);
     this.environments = this.load();
   }
-
-  // ── IEnvironmentRepository implementation ─────────────────────────
 
   findAll(): ICamundaEnvironment[] {
     return [...this.environments];
@@ -56,7 +46,6 @@ export class EnvironmentRepository implements IEnvironmentRepository {
     const wasActive = this.environments[idx].isActive;
     this.environments.splice(idx, 1);
 
-    // If we deleted the active one, activate the first remaining
     if (wasActive && this.environments.length > 0) {
       this.environments[0].isActive = true;
     }
@@ -64,8 +53,6 @@ export class EnvironmentRepository implements IEnvironmentRepository {
     this.persist();
     return true;
   }
-
-  // ── Convenience methods ───────────────────────────────────────────
 
   activate(id: string): ICamundaEnvironment | undefined {
     const target = this.environments.find((e) => e.id === id);
@@ -80,12 +67,9 @@ export class EnvironmentRepository implements IEnvironmentRepository {
     return this.environments.length;
   }
 
-  /** Force reload from disk */
   reload(): void {
     this.environments = this.load();
   }
-
-  // ── Private persistence ───────────────────────────────────────────
 
   private load(): ICamundaEnvironment[] {
     try {
@@ -94,10 +78,9 @@ export class EnvironmentRepository implements IEnvironmentRepository {
         return Array.isArray(data) ? data : [];
       }
     } catch {
-      // Corrupted file — fall through to defaults
+      // fall through to bootstrap defaults
     }
 
-    // Bootstrap from environment variables
     const defaultEnv: ICamundaEnvironment = {
       id: "default",
       name: process.env.CAMUNDA_ENV_NAME || "Default",

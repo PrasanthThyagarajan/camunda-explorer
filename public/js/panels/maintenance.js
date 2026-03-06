@@ -1,15 +1,7 @@
-/**
- * Maintenance Panel — Presentation layer.
- *
- * SRP: Duplicate scanning, batch resolve, stale incident cleanup.
- */
-
 import { api, rawApi } from '../api-client.js';
 import { esc, shortId, fmtDate, toast } from '../utils.js';
 import { state, panelLoaders } from '../state.js';
 import { showProgress, updateProgress, finishProgress } from '../progress.js';
-
-// ── Refresh Maintenance Panel ───────────────────────────────────────
 
 export function refreshMaintenance() {
   state.duplicateData = null;
@@ -26,8 +18,6 @@ export function refreshMaintenance() {
   document.getElementById('stale-resolve-btn').style.display = 'none';
   toast('Maintenance panel refreshed — run scans again', 'info');
 }
-
-// ── Duplicate Incidents ─────────────────────────────────────────────
 
 export async function scanDuplicates() {
   try {
@@ -114,8 +104,6 @@ export async function removeAllDuplicates() {
   }
 }
 
-// ── Batch Resolve ───────────────────────────────────────────────────
-
 export async function previewResolve() {
   try {
     const params = new URLSearchParams({ maxResults: '2000' });
@@ -171,8 +159,6 @@ export async function executeBatchResolve() {
     finishProgress({ succeeded: 0, failed: state.resolvePreviewIds.length, results: [{ incidentId: '—', status: 'error', message: e.message }] });
   }
 }
-
-// ── Stale Incident Finder ───────────────────────────────────────────
 
 export async function findStaleIncidents() {
   try {

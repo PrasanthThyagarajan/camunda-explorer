@@ -1,9 +1,3 @@
-/**
- * User Tasks Panel — Presentation layer.
- *
- * SRP: Listing, filtering, and completing user tasks.
- */
-
 import { api } from '../api-client.js';
 import { shortId, fmtDate, buildTable, toast } from '../utils.js';
 import { panelLoaders } from '../state.js';

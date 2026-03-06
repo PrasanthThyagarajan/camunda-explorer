@@ -1,9 +1,3 @@
-/**
- * MCP Resources — exposes Camunda artifacts (BPMN XML, DMN XML) as browsable resources.
- *
- * SOLID — DIP: Depends on ICamundaApiClient, not AxiosInstance.
- */
-
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ICamundaApiClient } from "../interfaces/index.js";
 import { logger } from "../utils/logger.js";
@@ -13,8 +7,6 @@ export function registerAllResources(
   client: ICamundaApiClient
 ): void {
   logger.info("Registering MCP resources...");
-
-  // ── BPMN XML Resource (by process definition ID) ────────────────────
   server.resource(
     "bpmn-xml",
     "camunda://process-definition/{definitionId}/xml",
@@ -25,8 +17,7 @@ export function registerAllResources(
     },
     async (uri) => {
       const parts = uri.pathname.split("/").filter(Boolean);
-      // URI: camunda://process-definition/{definitionId}/xml
-      const definitionId = parts[1]; // after "process-definition"
+      const definitionId = parts[1];
       try {
         const response = await client.get(
           `/process-definition/${definitionId}/xml`
@@ -55,8 +46,6 @@ export function registerAllResources(
       }
     }
   );
-
-  // ── DMN XML Resource (by decision definition ID) ────────────────────
   server.resource(
     "dmn-xml",
     "camunda://decision-definition/{definitionId}/xml",

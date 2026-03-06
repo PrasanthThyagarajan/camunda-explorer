@@ -1,17 +1,9 @@
-/**
- * MCP Prompts — pre-built prompt templates for common Camunda operations.
- * These guide the AI agent through multi-step workflows.
- */
-
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { logger } from "../utils/logger.js";
 
 export function registerAllPrompts(server: McpServer): void {
-  logger.info("Registering MCP prompts...");
-
-  // ── Analyse All Incidents ───────────────────────────────────────────
-  server.prompt(
+  logger.info("Registering MCP prompts...");  server.prompt(
     "analyse-incidents",
     "Analyse all current incidents in Camunda, group them by type and process, and suggest resolutions.",
     {
@@ -74,10 +66,7 @@ Be systematic and thorough. For each recommendation, provide the exact tool call
         ],
       };
     }
-  );
-
-  // ── Retry Failed Instance ───────────────────────────────────────────
-  server.prompt(
+  );  server.prompt(
     "retry-failed-instance",
     "Retry a failed process instance — analyse the failure, fix if possible, and retry the failed job or move the token back.",
     {
@@ -132,10 +121,7 @@ Please analyse and execute the most appropriate option.`,
         ],
       };
     }
-  );
-
-  // ── Move Instance to Initial Block ──────────────────────────────────
-  server.prompt(
+  );  server.prompt(
     "move-to-initial-block",
     "Move a stuck process instance back to its initial/starting activity.",
     {
@@ -180,10 +166,7 @@ Please execute this plan.`,
         ],
       };
     }
-  );
-
-  // ── Evaluate DMN Guide ──────────────────────────────────────────────
-  server.prompt(
+  );  server.prompt(
     "evaluate-dmn-guide",
     "Step-by-step guide to discover and evaluate a DMN decision table.",
     {
@@ -218,10 +201,7 @@ Please guide me through this.`,
         ],
       };
     }
-  );
-
-  // ── Engine Health Check ─────────────────────────────────────────────
-  server.prompt(
+  );  server.prompt(
     "engine-health-check",
     "Comprehensive health check of the Camunda engine — deployments, running instances, incidents, failed jobs.",
     {},

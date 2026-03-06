@@ -1,14 +1,6 @@
-/**
- * DMN Panel — Presentation layer.
- *
- * SRP: DMN decision search, input form, evaluation, XML view.
- */
-
 import { api, rawApi } from '../api-client.js';
 import { esc, copyBtn, toast } from '../utils.js';
 import { state, panelLoaders } from '../state.js';
-
-// ── Load Decision List ──────────────────────────────────────────────
 
 export async function loadDmnList() {
   try {
@@ -17,8 +9,6 @@ export async function loadDmnList() {
     document.getElementById('dmn-search').value = '';
   } catch (e) { toast('Failed to load decisions: ' + e.message, 'error'); }
 }
-
-// ── Dropdown Search ─────────────────────────────────────────────────
 
 export function filterDmnList() {
   const query = document.getElementById('dmn-search').value.toLowerCase();
@@ -53,7 +43,6 @@ export function selectDmn(key, name, version) {
   loadDmnDetail();
 }
 
-// ── Close dropdown on outside click ─────────────────────────────────
 export function initDmnDropdownClose() {
   document.addEventListener('click', (e) => {
     const dd = document.getElementById('dmn-dropdown');
@@ -63,8 +52,6 @@ export function initDmnDropdownClose() {
     }
   });
 }
-
-// ── Load DMN Detail ─────────────────────────────────────────────────
 
 async function loadDmnDetail() {
   const key = document.getElementById('dmn-key').value;
@@ -164,8 +151,6 @@ async function loadDmnDetail() {
   }
 }
 
-// ── Regenerate Payload from Fields ──────────────────────────────────
-
 export function regenerateDmnPayload() {
   const fields = document.querySelectorAll('.dmn-input-field');
   const rootGroups = {};
@@ -201,8 +186,6 @@ export function regenerateDmnPayload() {
 
   document.getElementById('dmn-variables').value = JSON.stringify(payload, null, 2);
 }
-
-// ── Evaluate DMN ────────────────────────────────────────────────────
 
 export async function evaluateDmn() {
   const key = document.getElementById('dmn-key').value;
@@ -266,5 +249,4 @@ export async function loadDmnXml() {
   } catch (e) { document.getElementById('dmn-result').innerHTML = `<div class="error-box">${e.message}</div>`; }
 }
 
-// Register in panel loader registry
 panelLoaders.dmn = loadDmnList;

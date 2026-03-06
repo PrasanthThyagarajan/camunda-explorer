@@ -1,17 +1,8 @@
-/**
- * Health Panel — Presentation layer.
- *
- * SRP: Loads engine statistics and renders the health dashboard.
- */
-
 import { api } from '../api-client.js';
 import { buildTable } from '../utils.js';
 import { panelLoaders } from '../state.js';
 import { updateBadge, setEngineStatus } from '../navigation.js';
 
-/**
- * Load engine health statistics and render the panel.
- */
 export async function loadHealth() {
   try {
     const stats = await api('/process-definition/statistics?failedJobs=true&incidents=true');
@@ -47,5 +38,4 @@ export async function loadHealth() {
   }
 }
 
-// Register in panel loader registry
 panelLoaders.health = loadHealth;

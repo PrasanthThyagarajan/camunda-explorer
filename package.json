@@ -1,11 +1,11 @@
 {
-  "name": "camunda-mcp-server",
+  "name": "camunda-explorer",
   "version": "1.0.0",
   "type": "module",
   "description": "MCP Server for Camunda Platform v7.16.0 — Analyse incidents, retry/modify instances, evaluate DMN, and more.",
   "main": "dist/index.js",
   "bin": {
-    "camunda-mcp-server": "dist/index.js"
+    "camunda-explorer": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",

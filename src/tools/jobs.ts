@@ -1,11 +1,3 @@
-/**
- * MCP Tools — Job Management
- *
- * Camunda 7.16 REST API: /job
- * Tools for listing, retrying, and managing jobs (timers, async tasks, failed jobs).
- * Critical for incident resolution — failed jobs are the #1 source of incidents.
- */
-
 import { z } from "zod";
 import { IToolModule } from "../interfaces/index.js";
 import { cleanParams } from "../utils/clean-params.js";
@@ -19,7 +11,6 @@ export const jobTools: IToolModule = {
   name: "Job tools",
 
   register(server, client) {
-    // ── List Jobs ───────────────────────────────────────────────────────
     server.tool(
       "camunda_list_jobs",
       "List jobs (async continuations, timers, failed jobs). Essential for diagnosing incidents caused by failed jobs.",
@@ -60,8 +51,6 @@ export const jobTools: IToolModule = {
         return formatResponse(data, summary);
       })
     );
-
-    // ── Get Job ─────────────────────────────────────────────────────────
     server.tool(
       "camunda_get_job",
       "Get details of a single job.",
@@ -73,8 +62,6 @@ export const jobTools: IToolModule = {
         return formatResponse(response.data);
       })
     );
-
-    // ── Get Job Exception Stacktrace ────────────────────────────────────
     server.tool(
       "camunda_get_job_stacktrace",
       "Get the full exception stacktrace of a failed job. Essential for understanding why an incident occurred.",
@@ -89,8 +76,6 @@ export const jobTools: IToolModule = {
         return formatResponse(response.data, `Stacktrace for job ${jobId}:`);
       })
     );
-
-    // ── Set Job Retries (RETRY FAILED JOB) ──────────────────────────────
     server.tool(
       "camunda_set_job_retries",
       `Set the number of retries for a job. This is the PRIMARY way to retry a failed job.
@@ -117,8 +102,6 @@ Typical usage: set retries to 1 to retry once, or 3 for multiple attempts.`,
         );
       })
     );
-
-    // ── Set Job Retries (Batch — by process instance) ───────────────────
     server.tool(
       "camunda_set_jobs_retries_by_process",
       "Set retries for all jobs of a specific process instance. Useful to retry all failed jobs at once.",
@@ -127,7 +110,6 @@ Typical usage: set retries to 1 to retry once, or 3 for multiple attempts.`,
         retries: z.number().describe("Number of retries to set"),
       },
       safeToolHandler(async ({ processInstanceId, retries }) => {
-        // First, get all jobs with 0 retries for this instance
         const jobsResponse = await client.get("/job", {
           params: { processInstanceId, noRetriesLeft: true },
         });
@@ -140,7 +122,6 @@ Typical usage: set retries to 1 to retry once, or 3 for multiple attempts.`,
           );
         }
 
-        // Set retries on each
         const results: string[] = [];
         for (const job of jobs) {
           try {
@@ -158,8 +139,6 @@ Typical usage: set retries to 1 to retry once, or 3 for multiple attempts.`,
         );
       })
     );
-
-    // ── Execute Job ─────────────────────────────────────────────────────
     server.tool(
       "camunda_execute_job",
       "Immediately execute a job (trigger it now regardless of due date).",
@@ -171,8 +150,6 @@ Typical usage: set retries to 1 to retry once, or 3 for multiple attempts.`,
         return formatResponse(null, `Job ${jobId} execution triggered.`);
       })
     );
-
-    // ── Set Job Due Date ────────────────────────────────────────────────
     server.tool(
       "camunda_set_job_duedate",
       "Set or update the due date of a job.",

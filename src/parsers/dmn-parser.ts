@@ -1,12 +1,3 @@
-/**
- * DMN XML Parser — pure functions, no side effects, no framework dependencies.
- *
- * Extracts input/output columns and metadata from DMN XML.
- * Builds sample payloads for Camunda REST API evaluation.
- *
- * SRP: This module's sole responsibility is DMN XML analysis.
- */
-
 import { DMN_TYPE_MAP } from "../constants.js";
 import type {
   IDmnInput,
@@ -15,9 +6,6 @@ import type {
   IDmnGroupedVariable,
 } from "../interfaces/parsers.js";
 
-/**
- * Parse a DMN XML string and extract inputs, outputs, hit policy, and decision name.
- */
 export function parseDmnInputs(dmnXml: string): IDmnParseResult {
   const decNameMatch = dmnXml.match(/<decision[^>]+name="([^"]+)"/);
   const decisionName = decNameMatch?.[1] || "Unknown";
@@ -25,7 +13,6 @@ export function parseDmnInputs(dmnXml: string): IDmnParseResult {
   const hitPolicyMatch = dmnXml.match(/<decisionTable[^>]+hitPolicy="([^"]+)"/);
   const hitPolicy = hitPolicyMatch?.[1] || "UNIQUE";
 
-  // Extract inputs
   const inputs: IDmnInput[] = [];
   const inputBlockRegex = /<input\s+([^>]*?)>([\s\S]*?)<\/input>/g;
   let inputMatch;
@@ -59,7 +46,6 @@ export function parseDmnInputs(dmnXml: string): IDmnParseResult {
     });
   }
 
-  // Extract outputs
   const outputs: IDmnOutput[] = [];
   const outputRegex = /<output\s+([^>]*?)\/?\s*>/g;
   let outputMatch;
@@ -80,11 +66,6 @@ export function parseDmnInputs(dmnXml: string): IDmnParseResult {
   return { inputs, outputs, hitPolicy, decisionName };
 }
 
-/**
- * Group DMN inputs by their root variable name.
- * Dot-notation expressions (e.g. "obj.field1", "obj.field2") are grouped
- * into a single nested variable.
- */
 export function groupDmnInputs(
   inputs: IDmnInput[]
 ): Record<string, IDmnGroupedVariable> {
@@ -119,9 +100,6 @@ export function groupDmnInputs(
   return grouped;
 }
 
-/**
- * Build a sample Camunda evaluation payload from grouped DMN inputs.
- */
 export function buildSamplePayload(
   grouped: Record<string, IDmnGroupedVariable>
 ): Record<string, unknown> {

@@ -1,10 +1,3 @@
-/**
- * MCP Tools — Process Definitions
- *
- * Camunda 7.16 REST API: /process-definition
- * Tools for listing, starting, and inspecting process definitions.
- */
-
 import { z } from "zod";
 import { IToolModule } from "../interfaces/index.js";
 import { cleanParams } from "../utils/clean-params.js";
@@ -17,9 +10,7 @@ import {
 export const processDefinitionTools: IToolModule = {
   name: "Process Definition tools",
 
-  register(server, client) {
-    // ── List Process Definitions ────────────────────────────────────────
-    server.tool(
+  register(server, client) {    server.tool(
       "camunda_list_process_definitions",
       "List deployed process definitions with optional filters.",
       {
@@ -71,10 +62,7 @@ export const processDefinitionTools: IToolModule = {
         ]);
         return formatResponse(data, summary);
       })
-    );
-
-    // ── Get Process Definition ──────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_process_definition",
       "Get a process definition by its deployment ID.",
       {
@@ -86,10 +74,7 @@ export const processDefinitionTools: IToolModule = {
         );
         return formatResponse(response.data);
       })
-    );
-
-    // ── Get Process Definition by Key ───────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_process_definition_by_key",
       "Get the latest version of a process definition by its key.",
       {
@@ -101,10 +86,7 @@ export const processDefinitionTools: IToolModule = {
         );
         return formatResponse(response.data);
       })
-    );
-
-    // ── Start Process Instance by Key ───────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_start_process_instance",
       "Start a new process instance from a process definition key. Optionally pass initial variables and a business key.",
       {
@@ -147,10 +129,7 @@ export const processDefinitionTools: IToolModule = {
           `Process instance started from definition '${processDefinitionKey}'. Instance ID: ${(response.data as Record<string, unknown>).id}`
         );
       })
-    );
-
-    // ── Start Process Instance by ID ────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_start_process_instance_by_id",
       "Start a new process instance from a specific process definition ID.",
       {
@@ -187,10 +166,7 @@ export const processDefinitionTools: IToolModule = {
           `Process instance started. ID: ${(response.data as Record<string, unknown>).id}`
         );
       })
-    );
-
-    // ── Get BPMN XML ────────────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_process_xml",
       "Get the BPMN 2.0 XML of a process definition. Useful for understanding the process flow and available activity IDs.",
       {
@@ -202,10 +178,7 @@ export const processDefinitionTools: IToolModule = {
         );
         return formatResponse(response.data);
       })
-    );
-
-    // ── Get BPMN XML by Key ─────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_process_xml_by_key",
       "Get BPMN 2.0 XML of the latest process definition version by key.",
       {
@@ -217,10 +190,7 @@ export const processDefinitionTools: IToolModule = {
         );
         return formatResponse(response.data);
       })
-    );
-
-    // ── Get Process Definition Statistics ───────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_process_statistics",
       "Get runtime statistics for all process definitions (instance counts, incidents, failed jobs). Great for an overview of engine health.",
       {
@@ -244,10 +214,7 @@ export const processDefinitionTools: IToolModule = {
         });
         return formatResponse(response.data);
       })
-    );
-
-    // ── Get Activity Statistics for a Definition ────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_activity_statistics",
       "Get runtime statistics per activity for a specific process definition. Shows how many instances are at each activity.",
       {

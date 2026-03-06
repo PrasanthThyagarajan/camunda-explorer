@@ -1,9 +1,3 @@
-/**
- * MCP Tools — Deployment Management
- *
- * Camunda 7.16 REST API: /deployment
- */
-
 import { z } from "zod";
 import { IToolModule } from "../interfaces/index.js";
 import { cleanParams } from "../utils/clean-params.js";
@@ -16,9 +10,7 @@ import {
 export const deploymentTools: IToolModule = {
   name: "Deployment tools",
 
-  register(server, client) {
-    // ── List Deployments ────────────────────────────────────────────────
-    server.tool(
+  register(server, client) {    server.tool(
       "camunda_list_deployments",
       "List deployments in the Camunda engine.",
       {
@@ -46,10 +38,7 @@ export const deploymentTools: IToolModule = {
         ]);
         return formatResponse(data, summary);
       })
-    );
-
-    // ── Get Deployment ──────────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_deployment",
       "Get a deployment by ID.",
       {
@@ -59,10 +48,7 @@ export const deploymentTools: IToolModule = {
         const response = await client.get(`/deployment/${deploymentId}`);
         return formatResponse(response.data);
       })
-    );
-
-    // ── Get Deployment Resources ────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_deployment_resources",
       "List all resources (BPMN, DMN, forms, etc.) within a deployment.",
       {
@@ -74,10 +60,7 @@ export const deploymentTools: IToolModule = {
         );
         return formatResponse(response.data);
       })
-    );
-
-    // ── Delete Deployment ───────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_delete_deployment",
       "Delete a deployment. WARNING: Can also delete running process instances if cascade is true.",
       {

@@ -1,139 +1,109 @@
-# Camunda MCP Server — Architecture Quick Reference
+# Architecture Notes
 
-> MCP Server + Dashboard for Camunda Platform v7.16.0 · Node.js ≥ 18
+Quick overview of how this project is put together. Two apps share one codebase:
 
----
-
-## What This Project Does
-
-Two apps in one codebase:
-
-| App | How it runs | Who uses it |
-|---|---|---|
-| **MCP Server** | `npm run dev:run` → STDIO pipe | AI agents (Cursor, Claude) call Camunda operations as tools |
-| **Dashboard** | `npm run dashboard` → http://localhost:3333 | Humans manage environments, incidents, DMN, batch ops in a browser |
+- **MCP Server** (`npm run dev:run`) — STDIO transport, used by AI agents (Cursor, Claude). Entry point: `src/index.ts`.
+- **Dashboard** (`npm run dashboard`) — Express server at port 3333. Entry point: `src/dashboard/server.ts`.
 
 ---
 
-## Languages
+## Tech stack
 
-| Language | Where | Notes |
-|---|---|---|
-| **TypeScript** | `src/` (all backend) | Strict mode, ES2022, Node16 ESM |
-| **JavaScript** | `public/js/` (all frontend) | Vanilla ES Modules, zero frameworks |
-| **HTML5** | `public/index.html` | Structure only — no inline JS or CSS |
-| **CSS3** | `public/css/styles.css` | Dark theme, CSS custom properties, Grid + Flexbox |
+**Backend** is TypeScript (strict mode, ESM). **Frontend** is vanilla JS using ES modules — no React, no bundler, just browser-native `import/export`. Styling is plain CSS with custom properties for theming.
+
+Runtime deps: `express`, `axios`, `zod`, `@modelcontextprotocol/sdk`, `cors`, `dotenv`.
+Dev deps: `typescript`, `tsx` (for running TS directly), `rimraf`.
 
 ---
 
-## Architecture — 4 Layers
+## Layers
+
+The backend follows a rough layered structure:
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Presentation    routes/ · tools/ · public/js/  │  ← Handles requests & UI
-├─────────────────────────────────────────────────┤
-│  Application     services/                      │  ← Business logic
-├─────────────────────────────────────────────────┤
-│  Domain          interfaces/ · parsers/         │  ← Contracts & models
-├─────────────────────────────────────────────────┤
-│  Infrastructure  repositories/ · client/        │  ← File I/O, HTTP calls
-└─────────────────────────────────────────────────┘
+Presentation    →  routes/, tools/, public/js/
+Application     →  services/
+Domain          →  interfaces/, parsers/
+Infrastructure  →  repositories/, client/
 ```
+
+**Routes** handle HTTP, **tools** handle MCP protocol calls, **services** contain business logic, **repositories** deal with persistence (JSON files for now), and **parsers** do the XML analysis work.
+
+The dashboard wires everything together in `server.ts` — that's the composition root where dependencies get created and injected.
 
 ---
 
-## Folder Structure (Key Files)
+## Folder layout
 
 ```
 src/
-├── index.ts                    # MCP Server entry point
-├── dashboard/server.ts         # Dashboard entry point (composition root)
-├── interfaces/                 # ICamundaApiClient, IToolModule, IEnvironmentRepository
-├── services/                   # EnvironmentService, IncidentService
-├── repositories/               # EnvironmentRepository (JSON file storage)
-├── routes/                     # Express routes (environment, proxy, actions, config)
-├── tools/                      # 10 MCP tool modules (~40+ tools)
-├── parsers/                    # BPMN & DMN XML parsers
-├── middleware/                 # Global error handler
-└── utils/                      # Logger, response formatter, safeToolHandler
+├── index.ts                    MCP server entry
+├── dashboard/server.ts         Dashboard entry (composition root)
+├── config.ts                   Reads env vars
+├── constants.ts                Shared constants
+├── interfaces/                 Contracts (ICamundaApiClient, IToolModule, etc.)
+├── services/                   EnvironmentService, IncidentService
+├── repositories/               JSON file persistence
+├── routes/                     Express route factories
+├── tools/                      10 MCP tool modules, ~60 tools total
+├── resources/                  MCP resources (BPMN/DMN XML)
+├── prompts/                    MCP prompt templates
+├── parsers/                    BPMN & DMN XML parsers
+├── middleware/                 Error handler
+├── client/                     Axios client factory + interceptors
+└── utils/                      Logger, response formatter, safeToolHandler
 
 public/
-├── index.html                  # HTML-only shell
-├── css/styles.css              # All styles
+├── index.html                  Shell (no inline JS/CSS)
+├── css/styles.css              Everything visual
 └── js/
-    ├── app.js                  # Entry point (imports → window bindings)
-    ├── state.js                # Shared state & registries
-    ├── api-client.js           # fetch() wrapper
-    ├── panels/ (11 files)      # One file per dashboard panel
-    └── components/ (2 files)   # Modify dialog, query explorer
+    ├── app.js                  Bootstraps the frontend, binds to window
+    ├── state.js                Shared state + panel registry
+    ├── api-client.js           fetch() wrapper
+    ├── panels/                 One JS file per sidebar panel (11 files)
+    └── components/             Modify dialog, query explorer
 ```
 
 ---
 
-## Design Patterns
+## Key patterns
 
-| Pattern | Where | What it does |
-|---|---|---|
-| **Composition Root** | `dashboard/server.ts`, `app.js` | Single place that creates & wires all dependencies |
-| **Repository** | `environment.repository.ts` | Hides file I/O behind `IEnvironmentRepository` interface |
-| **Factory** | `camunda-client.factory.ts`, all `create*Routes()` | Functions that build configured objects |
-| **Proxy** | `proxy.routes.ts` | Forwards `/api/*` to Camunda with auth injected |
-| **Registry** | `tools/index.ts`, `state.js` | Array/object of modules — add new ones without changing existing code |
-| **HOF / Decorator** | `safeToolHandler()`, `asyncHandler()` | Wraps functions with automatic error handling |
-| **Strategy** | `incident.service.ts` | `batchResolve(strategy: "retry" \| "delete")` — swappable behavior |
-| **Singleton** | `config.ts`, `state.js` | One shared instance for the entire app lifetime |
-| **DTO** | `interfaces/environment.ts` | Separate shapes for create, update, and safe-for-UI data |
-| **Interceptor** | `camunda-client.ts` | Axios interceptors for logging & error mapping |
-| **Barrel Export** | `interfaces/index.ts` | Re-exports everything from a folder via one file |
-| **Module Pattern** | All `public/js/*.js` | ES Modules with private scope; only `app.js` touches `window` |
+**Composition root** — `dashboard/server.ts` and `app.js` are the only places that create concrete instances and wire things together. Everything else receives its dependencies.
 
----
+**Repository pattern** — `EnvironmentRepository` wraps JSON file I/O behind an `IEnvironmentRepository` interface. If you wanted to swap to a database, you'd only change this class.
 
-## SOLID Principles
+**Tool registry** — `tools/index.ts` keeps an array of `IToolModule` objects. Each module registers its own tools on the MCP server. Adding a new domain means writing a new module and appending it to the array — nothing else changes.
 
-| Principle | How it's applied |
-|---|---|
-| **S** — Single Responsibility | Each file does one thing: `repository` = persistence, `service` = logic, `routes` = HTTP mapping, `parser` = XML analysis |
-| **O** — Open/Closed | Tool registry (`IToolModule[]`) and panel registry (`panelLoaders{}`) — extend by adding, never modifying |
-| **L** — Liskov Substitution | `EnvironmentRepository` is swappable for any `IEnvironmentRepository`; all 10 tool modules are interchangeable `IToolModule` |
-| **I** — Interface Segregation | `ICamundaApiClient` exposes only `get/post/put/delete` (not all of Axios); DTOs are split per use-case |
-| **D** — Dependency Inversion | Services depend on interfaces, not implementations. Concrete classes are injected at the composition root |
+**safeToolHandler** — a wrapper that catches errors in MCP tool handlers and formats them consistently. Keeps the try/catch boilerplate out of every tool.
+
+**asyncHandler** — same idea for Express routes. Catches async errors and forwards them to the error middleware.
+
+**Proxy route** — `/api/*` requests get forwarded straight to the active Camunda engine with auth injected. The frontend talks to `/api/incident` and the proxy turns it into a call to `https://your-camunda/engine-rest/incident`.
+
+**Panel registry** — on the frontend, each panel file registers itself in `state.js` so the navigation system knows how to load it. Same idea as the tool registry but for UI panels.
 
 ---
 
-## Libraries
+## How data flows
 
-### Runtime
-
-| Library | Why |
-|---|---|
-| **@modelcontextprotocol/sdk** | MCP protocol — tools, resources, prompts, STDIO transport |
-| **express** | HTTP server for dashboard API + static files |
-| **axios** | HTTP client to call Camunda REST API |
-| **zod** | Schema validation for MCP tool parameters |
-| **cors** | Cross-origin support for dashboard |
-| **dotenv** | Loads `.env` config into `process.env` |
-
-### Dev-only
-
-| Library | Why |
-|---|---|
-| **typescript** | Type safety, strict compilation |
-| **tsx** | Run `.ts` files directly in dev (no build step) |
-| **@types/*** | Type definitions for Node, Express, CORS |
-| **rimraf** | Clean `dist/` folder |
-| **@modelcontextprotocol/inspector** | Debug MCP tools in a browser UI |
-
-### Frontend
-
-**Zero dependencies** — vanilla JS + browser `fetch`.
-
----
-
-## Data Flow (2 paths)
+There are two paths depending on who's asking:
 
 ```
-AI Agent  →  STDIO  →  MCP Server  →  Tools  →  ICamundaApiClient  →  Axios  →  Camunda API
-Browser   →  HTTP   →  Express     →  /api/* proxy                 →  Axios  →  Camunda API
-                                   →  /environments                →  Service → Repository → JSON file
+AI agent  →  STDIO  →  MCP Server  →  tool modules  →  Axios  →  Camunda REST API
+Browser   →  HTTP   →  Express     →  /api/* proxy   →  Axios  →  Camunda REST API
+                                   →  /environments  →  service → repository → JSON file
 ```
+
+The MCP path and the dashboard proxy path both end up making the same kind of HTTP calls to Camunda. The difference is just the transport layer on the client side.
+
+---
+
+## SOLID in practice
+
+Not going to lecture about theory — here's where it actually shows up:
+
+- **Single responsibility**: parsers only parse, services only contain logic, routes only map HTTP, repositories only do persistence.
+- **Open/closed**: the tool and panel registries are arrays you extend by appending. You never touch existing module code to add something new.
+- **Liskov**: `EnvironmentRepository` can be swapped for any `IEnvironmentRepository`. All 10 tool modules implement the same `IToolModule` interface and are interchangeable.
+- **Interface segregation**: `ICamundaApiClient` only has `get/post/put/delete` — not the full Axios surface. DTOs are split by use case (create, update, safe-for-UI).
+- **Dependency inversion**: services depend on interfaces. The composition root decides which concrete classes to use.

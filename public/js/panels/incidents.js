@@ -1,9 +1,3 @@
-/**
- * Incidents Panel — Presentation layer.
- *
- * SRP: Incident listing, filtering, batch selection, single-incident actions.
- */
-
 import { api, rawApi } from '../api-client.js';
 import { esc, shortId, shortMsg, fmtDate, copyBtn, toast } from '../utils.js';
 import { state, panelLoaders } from '../state.js';
@@ -11,8 +5,6 @@ import { refreshCurrentPanel } from '../navigation.js';
 import { openDetail, closeDetail } from '../detail-panel.js';
 import { showProgress, updateProgress, finishProgress } from '../progress.js';
 import { openModifyDialog, modifyIncidentToStart, batchModifyToStart } from '../components/modify-dialog.js';
-
-// ── Process Definition Name Helpers ─────────────────────────────────
 
 async function loadProcDefNames() {
   if (Object.keys(state.procDefNameCache).length > 0) return;
@@ -61,8 +53,6 @@ async function buildProcDefFilterFromIncidents(incidents) {
     sel.value = currentValue;
   }
 }
-
-// ── Load Incidents ──────────────────────────────────────────────────
 
 export async function loadIncidents() {
   await loadProcDefNames();
@@ -118,8 +108,8 @@ export async function loadIncidents() {
       html += `<td><a href="#" onclick="showInstanceDetail('${r.processInstanceId}');return false">${shortId(r.processInstanceId)}</a>${copyBtn(r.processInstanceId)}</td>`;
       html += `<td>${fmtDate(r.incidentTimestamp)}${copyBtn(r.incidentTimestamp)}</td>`;
       html += `<td>
-        <button class="btn btn-success btn-sm" onclick="retryIncident('${r.id}','${r.processInstanceId}','${r.configuration}')">↻ Retry</button>
-        <button class="btn btn-primary btn-sm" onclick="modifyIncidentToStart('${r.id}')">🔄 Modify</button>
+        <button class="btn btn-success btn-sm" onclick="retryIncident('${r.id}','${r.processInstanceId}','${r.configuration}','${r.incidentType}')">↻ Retry</button>
+        <button class="btn btn-primary btn-sm" onclick="modifyIncidentToStart('${r.id}')">⇄ Modify</button>
       </td>`;
       html += `</tr>`;
     });
@@ -132,16 +122,34 @@ export async function loadIncidents() {
   }
 }
 
-// ── Single Incident Actions ─────────────────────────────────────────
-
-export async function retryIncident(incidentId, processInstanceId, jobId) {
+export async function retryIncident(incidentId, processInstanceId, configuration, incidentType) {
   try {
-    if (jobId) {
-      await api(`/job/${jobId}/retries`, { method: 'PUT', body: { retries: 1 } });
+    if (!configuration) {
+      toast('No associated job/task found. Use Modify instead.', 'info');
+      return;
+    }
+
+    if (incidentType === 'failedExternalTask') {
+      await api(`/external-task/${configuration}/retries`, { method: 'PUT', body: { retries: 1 } });
+      toast('External task retries set to 1 — engine will re-attempt', 'success');
+    } else if (incidentType === 'failedJob') {
+      await api(`/job/${configuration}/retries`, { method: 'PUT', body: { retries: 1 } });
       toast('Job retries set to 1 — engine will re-attempt execution', 'success');
     } else {
-      toast('No associated job found. Use Modify instead.', 'info');
+      // Unknown type — try job first, then external task as fallback
+      try {
+        await api(`/job/${configuration}/retries`, { method: 'PUT', body: { retries: 1 } });
+        toast('Retries set to 1 — engine will re-attempt', 'success');
+      } catch (_) {
+        try {
+          await api(`/external-task/${configuration}/retries`, { method: 'PUT', body: { retries: 1 } });
+          toast('External task retries set to 1 — engine will re-attempt', 'success');
+        } catch (__) {
+          toast(`Cannot retry incident type "${incidentType}". Use Modify instead.`, 'info');
+        }
+      }
     }
+
     setTimeout(refreshCurrentPanel, 1000);
   } catch (e) { toast('Retry failed: ' + e.message, 'error'); }
 }
@@ -184,15 +192,13 @@ export async function showIncidentDetail(id) {
     }
 
     html += `<div class="btn-group" style="flex-wrap:wrap">
-      <button class="btn btn-success" onclick="retryIncident('${inc.id}','${inc.processInstanceId}','${inc.configuration}')">↻ Retry Job</button>
-      <button class="btn btn-primary" onclick="closeDetail();modifyIncidentToStart('${inc.id}')">🔄 Modify</button>
+      <button class="btn btn-success" onclick="retryIncident('${inc.id}','${inc.processInstanceId}','${inc.configuration}','${inc.incidentType}')">↻ Retry</button>
+      <button class="btn btn-primary" onclick="closeDetail();modifyIncidentToStart('${inc.id}')">⇄ Modify</button>
     </div>`;
 
     openDetail('Incident: ' + shortId(inc.id), html);
   } catch (e) { toast('Failed to load: ' + e.message, 'error'); }
 }
-
-// ── Batch Selection ─────────────────────────────────────────────────
 
 export function getSelectedIncidentIds() {
   return [...document.querySelectorAll('.inc-checkbox:checked')].map(cb => cb.value);
@@ -232,8 +238,6 @@ export function deselectAllIncidents() {
   updateBatchBar();
 }
 
-// ── Batch Operations ────────────────────────────────────────────────
-
 export async function batchRetry() {
   const ids = getSelectedIncidentIds();
   if (ids.length === 0) { toast('Select incidents first', 'error'); return; }
@@ -253,5 +257,4 @@ export async function batchRetry() {
   }
 }
 
-// Register in panel loader registry
 panelLoaders.incidents = loadIncidents;

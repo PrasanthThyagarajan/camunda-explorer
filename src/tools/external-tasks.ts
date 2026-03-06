@@ -1,9 +1,3 @@
-/**
- * MCP Tools — External Task Management
- *
- * Camunda 7.16 REST API: /external-task
- */
-
 import { z } from "zod";
 import { IToolModule } from "../interfaces/index.js";
 import { cleanParams } from "../utils/clean-params.js";
@@ -16,9 +10,7 @@ import {
 export const externalTaskTools: IToolModule = {
   name: "External Task tools",
 
-  register(server, client) {
-    // ── List External Tasks ─────────────────────────────────────────────
-    server.tool(
+  register(server, client) {    server.tool(
       "camunda_list_external_tasks",
       "List external tasks with optional filters.",
       {
@@ -54,10 +46,7 @@ export const externalTaskTools: IToolModule = {
         ]);
         return formatResponse(data, summary);
       })
-    );
-
-    // ── Get External Task ───────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_external_task",
       "Get a single external task by ID.",
       {
@@ -69,10 +58,7 @@ export const externalTaskTools: IToolModule = {
         );
         return formatResponse(response.data);
       })
-    );
-
-    // ── Set External Task Retries ───────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_set_external_task_retries",
       "Set retries for a failed external task. Setting retries > 0 allows the worker to pick it up again.",
       {
@@ -88,10 +74,7 @@ export const externalTaskTools: IToolModule = {
           `External task ${externalTaskId} retries set to ${retries}.`
         );
       })
-    );
-
-    // ── Get External Task Error Details ─────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_external_task_error_details",
       "Get the full error details of a failed external task.",
       {

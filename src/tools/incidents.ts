@@ -1,10 +1,3 @@
-/**
- * MCP Tools — Incident Management
- *
- * Camunda 7.16 REST API: /incident
- * Tools for listing, inspecting, resolving, and annotating incidents.
- */
-
 import { z } from "zod";
 import { IToolModule } from "../interfaces/index.js";
 import { cleanParams } from "../utils/clean-params.js";
@@ -18,7 +11,6 @@ export const incidentTools: IToolModule = {
   name: "Incident tools",
 
   register(server, client) {
-    // ── List Incidents ──────────────────────────────────────────────────
     server.tool(
       "camunda_list_incidents",
       "List active incidents from Camunda engine with optional filters. Use this first to analyse what incidents exist.",
@@ -77,7 +69,6 @@ export const incidentTools: IToolModule = {
       })
     );
 
-    // ── Get Incident by ID ──────────────────────────────────────────────
     server.tool(
       "camunda_get_incident",
       "Get full details of a single incident by its ID.",
@@ -90,7 +81,6 @@ export const incidentTools: IToolModule = {
       })
     );
 
-    // ── Count Incidents ─────────────────────────────────────────────────
     server.tool(
       "camunda_count_incidents",
       "Get count of incidents matching the given filters.",
@@ -111,7 +101,6 @@ export const incidentTools: IToolModule = {
       })
     );
 
-    // ── Resolve (Delete) Incident ───────────────────────────────────────
     server.tool(
       "camunda_resolve_incident",
       "Resolve an incident by deleting it. WARNING: This is a destructive action. The incident will be permanently removed.",
@@ -127,7 +116,6 @@ export const incidentTools: IToolModule = {
       })
     );
 
-    // ── Set Annotation on Incident ──────────────────────────────────────
     server.tool(
       "camunda_annotate_incident",
       "Set an annotation/note on an incident for documentation purposes.",
@@ -144,7 +132,6 @@ export const incidentTools: IToolModule = {
       })
     );
 
-    // ── Clear Annotation ───────────────────────────────────────────────
     server.tool(
       "camunda_clear_incident_annotation",
       "Remove the annotation from an incident.",

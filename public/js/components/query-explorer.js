@@ -1,17 +1,8 @@
-/**
- * Query Explorer — Presentation component.
- *
- * SRP: API query explorer with curated queries, execution, and results rendering.
- */
-
 import { api } from '../api-client.js';
 import { esc, fmtDate, buildTable, toast } from '../utils.js';
 import { state } from '../state.js';
 
-// ── 20 Curated Queries ──────────────────────────────────────────────
-
 const QE_QUERIES = {
-  // ─── Incident Analysis ────────────────────────────────────────
   'inc-all': {
     method: 'GET', path: '/incident',
     params: 'sortBy=incidentTimestamp&sortOrder=desc',
@@ -42,8 +33,6 @@ const QE_QUERIES = {
     hint: 'All historically open incidents with full audit details.',
     description: 'Full incident history with timestamps and chain.',
   },
-
-  // ─── Process Instance Queries ─────────────────────────────────
   'pi-with-incidents': {
     method: 'POST', path: '/process-instance',
     body: { withIncident: true, sortBy: 'definitionId', sortOrder: 'asc' },
@@ -74,8 +63,6 @@ const QE_QUERIES = {
     hint: 'Powerful Cockpit-style search! Filter by process variable values.',
     description: 'Cockpit-style search by variable value.',
   },
-
-  // ─── Jobs & External Tasks ────────────────────────────────────
   'job-failed': {
     method: 'GET', path: '/job',
     params: 'noRetriesLeft=true&sortBy=jobDueDate&sortOrder=asc',
@@ -94,8 +81,6 @@ const QE_QUERIES = {
     hint: 'External tasks with zero retries — workers failed to process these.',
     description: 'External tasks that workers failed to process.',
   },
-
-  // ─── History & Audit ──────────────────────────────────────────
   'hist-last-24h': {
     method: 'POST', path: '/history/process-instance',
     body: { startedAfter: '__LAST_24H__', sortBy: 'startTime', sortOrder: 'desc' },
@@ -126,8 +111,6 @@ const QE_QUERIES = {
     hint: 'All currently executing activity instances.',
     description: 'What is the engine actually doing right now?',
   },
-
-  // ─── Definitions & Deployments ────────────────────────────────
   'def-latest': {
     method: 'GET', path: '/process-definition',
     params: 'latestVersion=true&sortBy=name&sortOrder=asc',
@@ -140,8 +123,6 @@ const QE_QUERIES = {
     hint: 'Instance counts, failed jobs, and incident counts per definition. The <b>most informative single query</b>.',
     description: 'The single most informative query — engine-wide stats.',
   },
-
-  // ─── Custom ───────────────────────────────────────────────────
   'custom': {
     method: 'GET', path: '',
     hint: 'Enter any Camunda REST API path manually.',
@@ -149,16 +130,12 @@ const QE_QUERIES = {
   },
 };
 
-// ── Toggle ──────────────────────────────────────────────────────────
-
 export function toggleQueryExplorer() {
   const body = document.getElementById('qe-body');
   const toggle = document.getElementById('qe-toggle');
   const isOpen = body.classList.toggle('open');
   toggle.classList.toggle('open', isOpen);
 }
-
-// ── Query Selection ─────────────────────────────────────────────────
 
 function replaceDatePlaceholders(obj) {
   for (const key in obj) {
@@ -210,8 +187,6 @@ export function onQeQuerySelect() {
   document.getElementById('qe-status').textContent = '';
   state.qeResultData = null;
 }
-
-// ── Execute Query ───────────────────────────────────────────────────
 
 export async function executeQuery() {
   const method = document.getElementById('qe-method').value;
@@ -273,8 +248,6 @@ export async function executeQuery() {
     state.qeResultData = null;
   }
 }
-
-// ── Render Results ──────────────────────────────────────────────────
 
 function renderQeResults(data) {
   if (!data || data.length === 0) {
@@ -353,8 +326,6 @@ function renderQeResults(data) {
 
   document.getElementById('qe-results-table').innerHTML = buildTable(cols, data);
 }
-
-// ── Copy / Reset ────────────────────────────────────────────────────
 
 export function copyQueryResults() {
   if (!state.qeResultData) { toast('No results to copy', 'info'); return; }

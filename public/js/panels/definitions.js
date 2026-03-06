@@ -1,9 +1,3 @@
-/**
- * Process Definitions Panel — Presentation layer.
- *
- * SRP: Listing definitions, viewing BPMN XML, starting instances.
- */
-
 import { api } from '../api-client.js';
 import { esc, shortId, buildTable, toast } from '../utils.js';
 import { panelLoaders } from '../state.js';
@@ -34,16 +28,6 @@ export async function showBpmnXml(defId) {
   } catch (e) { toast('Failed: ' + e.message, 'error'); }
 }
 
-export async function promptStartInstance(key) {
-  const vars = prompt('Variables JSON (or leave empty):', '{}');
-  if (vars === null) return;
-  try {
-    const variables = JSON.parse(vars || '{}');
-    const res = await api(`/process-definition/key/${key}/start`, {
-      method: 'POST', body: { variables, withVariablesInReturn: true }
-    });
-    toast(`Instance started: ${res.id}`, 'success');
-  } catch (e) { toast('Failed: ' + e.message, 'error'); }
-}
+export { promptStartInstance } from '../components/start-dialog.js';
 
 panelLoaders.definitions = loadDefinitions;

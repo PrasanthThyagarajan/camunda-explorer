@@ -1,14 +1,7 @@
-/**
- * Actions Routes — Presentation layer (thin controller).
- *
- * Handles BPMN analysis, DMN input parsing, batch operations, and duplicate detection.
- * SRP: Maps HTTP requests to domain services and parsers.
- */
-
 import { Router } from "express";
 import { AxiosInstance } from "axios";
 import { asyncHandler } from "../middleware/error-handler.js";
-import { parseFirstActivity, parseAllActivities, parseDmnInputs, groupDmnInputs, buildSamplePayload } from "../parsers/index.js";
+import { parseFirstActivity, parseAllActivities, parseStartFormFields, parseDmnInputs, groupDmnInputs, buildSamplePayload } from "../parsers/index.js";
 import { IncidentService } from "../services/incident.service.js";
 import { buildCamundaClient } from "../services/camunda-client.factory.js";
 import type { EnvironmentService } from "../services/environment.service.js";
@@ -19,16 +12,12 @@ export function createActionsRoutes(
 ): Router {
   const router = Router();
 
-  /** Get an authenticated Camunda client for the active environment */
   function getClient(): AxiosInstance {
     const env = envService.getActive();
     if (!env) throw Object.assign(new Error("No active environment"), { statusCode: 503 });
     return buildCamundaClient(env);
   }
 
-  // ── BPMN Analysis ─────────────────────────────────────────────────
-
-  // Get first activity of a process definition
   router.get(
     "/first-activity/:processDefinitionId",
     asyncHandler(async (req, res) => {
@@ -42,7 +31,6 @@ export function createActionsRoutes(
     })
   );
 
-  // Get all BPMN activities in flow order
   router.get(
     "/bpmn-activities/:processDefinitionId",
     asyncHandler(async (req, res) => {
@@ -60,9 +48,58 @@ export function createActionsRoutes(
     })
   );
 
-  // ── DMN Analysis ──────────────────────────────────────────────────
+  router.get(
+    "/start-form/:processDefinitionKey",
+    asyncHandler(async (req, res) => {
+      const client = getClient();
+      const key = req.params.processDefinitionKey;
 
-  // Parse DMN inputs for a decision key
+      const xmlRes = await client.get(`/process-definition/key/${key}/xml`);
+      const bpmnXml = xmlRes.data.bpmn20Xml;
+      if (!bpmnXml) {
+        return res.status(422).json({ error: "No BPMN XML returned" });
+      }
+
+      const parsed = parseStartFormFields(bpmnXml);
+
+      let apiFormVars: Record<string, unknown> = {};
+      try {
+        const formVarRes = await client.get(`/process-definition/key/${key}/form-variables`);
+        apiFormVars = formVarRes.data || {};
+      } catch {
+        // form-variables not available — that's fine
+      }
+
+      if (!parsed.hasFormFields && Object.keys(apiFormVars).length > 0) {
+        for (const [varName, varDef] of Object.entries(apiFormVars)) {
+          const def = varDef as { type?: string; value?: unknown };
+          const type = (def.type || "String").toLowerCase();
+          parsed.formFields.push({
+            id: varName,
+            label: varName,
+            type,
+            defaultValue: def.value != null ? String(def.value) : "",
+            enumValues: [],
+          });
+
+          let sampleValue: unknown;
+          let camundaType: string;
+          switch (type) {
+            case "integer": sampleValue = 0; camundaType = "Integer"; break;
+            case "long": sampleValue = 0; camundaType = "Long"; break;
+            case "double": sampleValue = 0.0; camundaType = "Double"; break;
+            case "boolean": sampleValue = false; camundaType = "Boolean"; break;
+            default: sampleValue = ""; camundaType = "String"; break;
+          }
+          parsed.samplePayload[varName] = { value: def.value ?? sampleValue, type: camundaType };
+        }
+        parsed.hasFormFields = true;
+      }
+
+      res.json(parsed);
+    })
+  );
+
   router.get(
     "/dmn-inputs/:decisionKey",
     asyncHandler(async (req, res) => {
@@ -89,7 +126,6 @@ export function createActionsRoutes(
     })
   );
 
-  // Test DMN evaluation directly (bypass proxy for debugging)
   router.post(
     "/test-dmn-evaluate/:decisionKey",
     asyncHandler(async (req, res) => {
@@ -120,9 +156,6 @@ export function createActionsRoutes(
     })
   );
 
-  // ── Batch Operations ──────────────────────────────────────────────
-
-  // Batch modify incidents → move to target activity
   router.post(
     "/batch-modify-to-start",
     asyncHandler(async (req, res) => {
@@ -139,7 +172,6 @@ export function createActionsRoutes(
     })
   );
 
-  // Batch resolve incidents
   router.post(
     "/batch-resolve",
     asyncHandler(async (req, res) => {
@@ -153,7 +185,6 @@ export function createActionsRoutes(
     })
   );
 
-  // Batch retry incidents
   router.post(
     "/batch-retry",
     asyncHandler(async (req, res) => {
@@ -167,7 +198,6 @@ export function createActionsRoutes(
     })
   );
 
-  // Find duplicate incidents
   router.get(
     "/find-duplicates",
     asyncHandler(async (_req, res) => {

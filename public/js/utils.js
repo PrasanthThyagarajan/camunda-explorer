@@ -1,13 +1,3 @@
-/**
- * Utility functions — Domain layer (pure functions).
- *
- * SRP: String formatting, DOM helpers, clipboard, table building.
- * All functions are stateless and side-effect-free (except clipboard/toast).
- */
-
-// ── String Helpers ──────────────────────────────────────────────────
-
-/** HTML-escape a string to prevent XSS. */
 export function esc(s) {
   if (!s) return '';
   const d = document.createElement('div');
@@ -15,31 +5,21 @@ export function esc(s) {
   return d.innerHTML;
 }
 
-/** Truncate an ID for display. */
 export function shortId(id) {
   return id ? (id.length > 16 ? id.substring(0, 14) + '…' : id) : '—';
 }
 
-/** Truncate a message for display. */
 export function shortMsg(s, max) {
   if (!s) return '—';
   return s.length > max ? s.substring(0, max) + '…' : s;
 }
 
-/** Format a date string for display. */
 export function fmtDate(d) {
   return d ? new Date(d).toLocaleString() : '—';
 }
 
-// ── Toast Notifications ─────────────────────────────────────────────
-
 const TOAST_DURATION = 4000;
 
-/**
- * Show a toast notification.
- * @param {string} msg
- * @param {'info'|'success'|'error'} type
- */
 export function toast(msg, type = 'info') {
   const el = document.createElement('div');
   el.className = 'toast toast-' + type;
@@ -48,13 +28,6 @@ export function toast(msg, type = 'info') {
   setTimeout(() => el.remove(), TOAST_DURATION);
 }
 
-// ── Clipboard Copy ──────────────────────────────────────────────────
-
-/**
- * Copy a value to clipboard via a copy button element.
- * @param {HTMLElement} btn — the button that was clicked
- * @param {string} value   — the value to copy
- */
 export function copyVal(btn, value) {
   const onSuccess = () => {
     btn.classList.add('copied');
@@ -76,26 +49,17 @@ export function copyVal(btn, value) {
   });
 }
 
-/**
- * Generate a copy button HTML string for a value.
- * @param {string} value
- * @returns {string} HTML string
- */
 export function copyBtn(value) {
   if (!value || value === '—' || value === 'null') return '';
   const escaped = String(value).replace(/'/g, "\\'").replace(/"/g, '&quot;');
   return `<button class="copy-btn" onclick="event.stopPropagation();copyVal(this,'${escaped}')" title="Copy: ${escaped}">📋</button>`;
 }
 
-// ── Table Builder ───────────────────────────────────────────────────
-
 /**
  * Build an HTML table from column definitions and row data.
- *
  * @param {Array<{key?: string, label: string, render?: Function, copyVal?: Function, noCopy?: boolean}>} cols
  * @param {Array<object>} rows
- * @param {Function} [actions] — optional function that returns action buttons HTML for each row
- * @returns {string} HTML string
+ * @param {Function} [actions] — optional action buttons renderer per row
  */
 export function buildTable(cols, rows, actions) {
   if (!rows || rows.length === 0) return '<div class="empty">No data found.</div>';

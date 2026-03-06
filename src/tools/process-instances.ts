@@ -1,10 +1,3 @@
-/**
- * MCP Tools — Process Instance Management
- *
- * Camunda 7.16 REST API: /process-instance
- * Tools for listing, inspecting, modifying, suspending instances and managing variables.
- */
-
 import { z } from "zod";
 import { IToolModule } from "../interfaces/index.js";
 import { cleanParams } from "../utils/clean-params.js";
@@ -13,8 +6,6 @@ import {
   formatResponse,
   summarizeList,
 } from "../utils/response-formatter.js";
-
-// ── Shared Zod schemas ────────────────────────────────────────────
 
 const variableValueSchema = z.object({
   value: z.any().describe("Variable value"),
@@ -69,7 +60,6 @@ export const processInstanceTools: IToolModule = {
   name: "Process Instance tools",
 
   register(server, client) {
-    // ── List Process Instances ──────────────────────────────────────────
     server.tool(
       "camunda_list_process_instances",
       "List running process instances with optional filters.",
@@ -106,7 +96,6 @@ export const processInstanceTools: IToolModule = {
       })
     );
 
-    // ── Get Process Instance ────────────────────────────────────────────
     server.tool(
       "camunda_get_process_instance",
       "Get details of a single process instance.",
@@ -121,7 +110,6 @@ export const processInstanceTools: IToolModule = {
       })
     );
 
-    // ── Get Activity Instance Tree ──────────────────────────────────────
     server.tool(
       "camunda_get_activity_instances",
       "Get the activity instance tree of a running process instance. Shows current execution positions — essential for understanding where a process is stuck or to plan modifications.",
@@ -136,7 +124,6 @@ export const processInstanceTools: IToolModule = {
       })
     );
 
-    // ── Modify Process Instance (CORE — retry / move to initial) ───────
     server.tool(
       "camunda_modify_process_instance",
       `Modify a running process instance by cancelling and/or starting activity instances.
@@ -178,7 +165,7 @@ IMPORTANT: Use camunda_get_activity_instances first to find current activity IDs
             skipCustomListeners: skipCustomListeners ?? false,
             skipIoMappings: skipIoMappings ?? false,
             instructions,
-            annotation: annotation ?? "Modified via Camunda MCP Server",
+            annotation: annotation ?? "Modified via Camunda Explorer",
           }
         );
         return formatResponse(
@@ -188,7 +175,6 @@ IMPORTANT: Use camunda_get_activity_instances first to find current activity IDs
       })
     );
 
-    // ── Suspend Process Instance ────────────────────────────────────────
     server.tool(
       "camunda_suspend_process_instance",
       "Suspend a running process instance. Suspended instances will not execute any further.",
@@ -207,7 +193,6 @@ IMPORTANT: Use camunda_get_activity_instances first to find current activity IDs
       })
     );
 
-    // ── Activate Process Instance ───────────────────────────────────────
     server.tool(
       "camunda_activate_process_instance",
       "Activate a previously suspended process instance.",
@@ -226,7 +211,6 @@ IMPORTANT: Use camunda_get_activity_instances first to find current activity IDs
       })
     );
 
-    // ── Delete Process Instance ─────────────────────────────────────────
     server.tool(
       "camunda_delete_process_instance",
       "Delete a process instance. WARNING: Destructive and irreversible.",
@@ -259,7 +243,6 @@ IMPORTANT: Use camunda_get_activity_instances first to find current activity IDs
       })
     );
 
-    // ── Get Variables ────────────────────────────────────────────────────
     server.tool(
       "camunda_get_instance_variables",
       "Get all variables of a process instance.",
@@ -283,7 +266,6 @@ IMPORTANT: Use camunda_get_activity_instances first to find current activity IDs
       })
     );
 
-    // ── Set / Update a Single Variable ──────────────────────────────────
     server.tool(
       "camunda_set_instance_variable",
       "Set or update a single variable on a process instance.",
@@ -308,7 +290,6 @@ IMPORTANT: Use camunda_get_activity_instances first to find current activity IDs
       })
     );
 
-    // ── Modify Variables (batch update/delete) ──────────────────────────
     server.tool(
       "camunda_modify_instance_variables",
       "Batch update and/or delete multiple variables on a process instance.",
@@ -335,7 +316,6 @@ IMPORTANT: Use camunda_get_activity_instances first to find current activity IDs
       })
     );
 
-    // ── Delete Variable ─────────────────────────────────────────────────
     server.tool(
       "camunda_delete_instance_variable",
       "Delete a single variable from a process instance.",

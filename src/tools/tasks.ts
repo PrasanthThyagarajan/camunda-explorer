@@ -1,10 +1,3 @@
-/**
- * MCP Tools — Task Management
- *
- * Camunda 7.16 REST API: /task
- * Tools for listing, claiming, completing, and managing user tasks.
- */
-
 import { z } from "zod";
 import { IToolModule } from "../interfaces/index.js";
 import { cleanParams } from "../utils/clean-params.js";
@@ -17,9 +10,7 @@ import {
 export const taskTools: IToolModule = {
   name: "Task tools",
 
-  register(server, client) {
-    // ── List Tasks ──────────────────────────────────────────────────────
-    server.tool(
+  register(server, client) {    server.tool(
       "camunda_list_tasks",
       "List user tasks with optional filters.",
       {
@@ -81,10 +72,7 @@ export const taskTools: IToolModule = {
         ]);
         return formatResponse(data, summary);
       })
-    );
-
-    // ── Get Task ────────────────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_task",
       "Get details of a single task.",
       {
@@ -94,10 +82,7 @@ export const taskTools: IToolModule = {
         const response = await client.get(`/task/${taskId}`);
         return formatResponse(response.data);
       })
-    );
-
-    // ── Complete Task ───────────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_complete_task",
       "Complete a user task, optionally setting output variables.",
       {
@@ -125,10 +110,7 @@ export const taskTools: IToolModule = {
           `Task ${taskId} completed.`
         );
       })
-    );
-
-    // ── Claim Task ──────────────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_claim_task",
       "Claim a task for a user.",
       {
@@ -139,10 +121,7 @@ export const taskTools: IToolModule = {
         await client.post(`/task/${taskId}/claim`, { userId });
         return formatResponse(null, `Task ${taskId} claimed by ${userId}.`);
       })
-    );
-
-    // ── Unclaim Task ────────────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_unclaim_task",
       "Unclaim a previously claimed task.",
       {
@@ -152,10 +131,7 @@ export const taskTools: IToolModule = {
         await client.post(`/task/${taskId}/unclaim`, {});
         return formatResponse(null, `Task ${taskId} unclaimed.`);
       })
-    );
-
-    // ── Assign Task ─────────────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_assign_task",
       "Assign a task to a specific user.",
       {
@@ -166,10 +142,7 @@ export const taskTools: IToolModule = {
         await client.post(`/task/${taskId}/assignee`, { userId });
         return formatResponse(null, `Task ${taskId} assigned to ${userId}.`);
       })
-    );
-
-    // ── Delegate Task ───────────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_delegate_task",
       "Delegate a task to another user.",
       {
@@ -180,10 +153,7 @@ export const taskTools: IToolModule = {
         await client.post(`/task/${taskId}/delegate`, { userId });
         return formatResponse(null, `Task ${taskId} delegated to ${userId}.`);
       })
-    );
-
-    // ── Get Task Variables ──────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_get_task_variables",
       "Get all variables visible in the scope of a task.",
       {
@@ -196,10 +166,7 @@ export const taskTools: IToolModule = {
         });
         return formatResponse(response.data);
       })
-    );
-
-    // ── Set Task Variable ───────────────────────────────────────────────
-    server.tool(
+    );    server.tool(
       "camunda_set_task_variable",
       "Set or update a single variable on a task.",
       {

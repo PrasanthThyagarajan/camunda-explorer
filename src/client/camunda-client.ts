@@ -1,13 +1,6 @@
-/**
- * Camunda REST API HTTP client.
- * Wraps axios with auth, timeout, and structured error handling.
- */
-
 import axios, { AxiosInstance, AxiosError } from "axios";
 import { AppConfig } from "../config.js";
 import { logger } from "../utils/logger.js";
-
-// ── Custom error class for Camunda API errors ──────────────────────
 
 export class CamundaApiError extends Error {
   public statusCode: number;
@@ -25,8 +18,6 @@ export class CamundaApiError extends Error {
   }
 }
 
-// ── Client factory ─────────────────────────────────────────────────
-
 export function createCamundaClient(config: AppConfig): AxiosInstance {
   const client = axios.create({
     baseURL: config.camundaBaseUrl,
@@ -37,7 +28,6 @@ export function createCamundaClient(config: AppConfig): AxiosInstance {
     },
   });
 
-  // Basic Auth
   if (config.camundaUsername && config.camundaPassword) {
     client.defaults.auth = {
       username: config.camundaUsername,
@@ -47,7 +37,6 @@ export function createCamundaClient(config: AppConfig): AxiosInstance {
       `Camunda client configured with Basic Auth (user: ${config.camundaUsername})`
     );
   }
-  // Bearer Token Auth
   else if (config.camundaToken) {
     client.defaults.headers.common["Authorization"] =
       `Bearer ${config.camundaToken}`;
@@ -55,16 +44,12 @@ export function createCamundaClient(config: AppConfig): AxiosInstance {
   } else {
     logger.warn("Camunda client configured WITHOUT authentication");
   }
-
-  // ── Request interceptor (logging) ────────────────────────────────
   client.interceptors.request.use((req) => {
     logger.debug(`→ ${req.method?.toUpperCase()} ${req.baseURL}${req.url}`, {
       params: req.params,
     });
     return req;
   });
-
-  // ── Response interceptor (error mapping) ─────────────────────────
   client.interceptors.response.use(
     (response) => {
       logger.debug(
@@ -86,7 +71,6 @@ export function createCamundaClient(config: AppConfig): AxiosInstance {
           body
         );
       }
-      // Network / timeout errors
       logger.error(`Camunda network error: ${error.message}`);
       throw error;
     }
@@ -96,6 +80,4 @@ export function createCamundaClient(config: AppConfig): AxiosInstance {
   return client;
 }
 
-// ── Re-export cleanParams from its new home in utils ────────────────
-// Kept here for backward compatibility; prefer importing from utils/clean-params.
 export { cleanParams } from "../utils/clean-params.js";

@@ -1,15 +1,3 @@
-/**
- * Utilities for formatting Camunda API responses into MCP tool responses.
- *
- * The MCP SDK expects tool callbacks to return objects with an index signature
- * `{ [x: string]: unknown; content: [...]; ... }`. We use a plain-object return
- * shape instead of a named interface so TypeScript doesn't complain about the
- * missing index signature.
- */
-
-/**
- * Format a successful response.
- */
 export function formatResponse(
   data: unknown,
   summary?: string
@@ -30,9 +18,6 @@ export function formatResponse(
   return { content: parts.length > 0 ? parts : [{ type: "text", text: "OK" }] };
 }
 
-/**
- * Format an error response.
- */
 export function formatError(
   error: unknown
 ): { content: Array<{ type: "text"; text: string }>; isError: true; [key: string]: unknown } {
@@ -83,10 +68,6 @@ export function formatError(
   };
 }
 
-/**
- * Build a compact summary table string from an array of objects,
- * handy for presenting list results to the AI.
- */
 export function summarizeList(
   items: Record<string, unknown>[],
   label: string,

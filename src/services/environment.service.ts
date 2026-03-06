@@ -1,11 +1,3 @@
-/**
- * Environment Service — Application layer.
- *
- * Business logic for managing Camunda environments.
- * DIP: Depends on IEnvironmentRepository interface, not concrete file storage.
- * SRP: Sole responsibility is environment CRUD + connection testing.
- */
-
 import type {
   ICamundaEnvironment,
   ICamundaEnvironmentSafe,
@@ -19,8 +11,6 @@ import { DEFAULT_ENV_COLOR, PASSWORD_MASK } from "../constants.js";
 
 export class EnvironmentService {
   constructor(private readonly repo: EnvironmentRepository) {}
-
-  // ── Queries ───────────────────────────────────────────────────────
 
   getAll(): ICamundaEnvironmentSafe[] {
     return this.repo.findAll().map((e) => this.toSafe(e));
@@ -53,8 +43,6 @@ export class EnvironmentService {
   count(): number {
     return this.repo.count();
   }
-
-  // ── Commands ──────────────────────────────────────────────────────
 
   create(dto: ICreateEnvironmentDto): ICamundaEnvironmentSafe {
     const id =
@@ -105,8 +93,6 @@ export class EnvironmentService {
     return this.repo.delete(id);
   }
 
-  // ── Connection Test ───────────────────────────────────────────────
-
   async testConnection(
     baseUrl: string,
     username?: string,
@@ -127,8 +113,6 @@ export class EnvironmentService {
       };
     }
   }
-
-  // ── Private helpers ───────────────────────────────────────────────
 
   private toSafe(env: ICamundaEnvironment): ICamundaEnvironmentSafe {
     return {

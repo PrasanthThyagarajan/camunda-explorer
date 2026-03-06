@@ -1,23 +1,15 @@
-/**
- * Application-wide constants — eliminates magic numbers and scattered defaults.
- */
-
-// ── Server ──────────────────────────────────────────────────────────
 export const DEFAULT_DASHBOARD_PORT = 3333;
 export const JSON_BODY_LIMIT = "10mb";
 
-// ── Camunda Client ──────────────────────────────────────────────────
 export const DEFAULT_BASE_URL = "http://localhost:8080/engine-rest";
 export const DEFAULT_REQUEST_TIMEOUT = 30000;
 export const CONNECTION_TEST_TIMEOUT = 10000;
 export const DEFAULT_MAX_RESULTS = 100;
 
-// ── Batch Processing ────────────────────────────────────────────────
 export const DEFAULT_BATCH_SIZE = 10;
 export const MAX_INCIDENTS_FETCH = 2000;
 export const DEFAULT_RETRY_COUNT = 1;
 
-// ── BPMN Parsing ────────────────────────────────────────────────────
 export const MAX_GATEWAY_TRAVERSAL_HOPS = 10;
 export const BPMN_ACTIVITY_TYPES = [
   "serviceTask",
@@ -44,7 +36,6 @@ export const BPMN_GATEWAY_TYPES = [
 
 export const BPMN_EVENT_TYPES = ["startEvent", "endEvent"] as const;
 
-// ── DMN Type Mapping ────────────────────────────────────────────────
 export const DMN_TYPE_MAP: Record<string, { camundaType: string; sampleValue: unknown }> = {
   string:  { camundaType: "String",  sampleValue: "" },
   integer: { camundaType: "Integer", sampleValue: 0 },
@@ -54,7 +45,6 @@ export const DMN_TYPE_MAP: Record<string, { camundaType: string; sampleValue: un
   date:    { camundaType: "Date",    sampleValue: "2026-01-01T00:00:00.000+0000" },
 };
 
-// ── Environment ─────────────────────────────────────────────────────
 export const DEFAULT_ENV_COLOR = "#3b82f6";
 export const PASSWORD_MASK = "••••••••";
 export const ENV_FILE_NAME = "environments.json";

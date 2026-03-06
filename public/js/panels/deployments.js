@@ -1,9 +1,3 @@
-/**
- * Deployments Panel — Presentation layer.
- *
- * SRP: Listing deployments and viewing resources.
- */
-
 import { api } from '../api-client.js';
 import { esc, shortId, fmtDate, buildTable, toast } from '../utils.js';
 import { panelLoaders } from '../state.js';

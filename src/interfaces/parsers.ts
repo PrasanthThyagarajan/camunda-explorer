@@ -1,10 +1,3 @@
-/**
- * Interfaces for BPMN and DMN parser results.
- * Pure domain models — framework-independent.
- */
-
-// ── BPMN ────────────────────────────────────────────────────────────
-
 export interface IBpmnFirstActivity {
   startEventId: string;
   firstActivityId: string;
@@ -25,8 +18,6 @@ export interface IBpmnActivitiesResult {
   firstActivityId: string | null;
   activities: IBpmnActivity[];
 }
-
-// ── DMN ─────────────────────────────────────────────────────────────
 
 export interface IDmnInput {
   id: string;
@@ -72,4 +63,20 @@ export interface IDmnInputsResponse {
   outputs: IDmnOutput[];
   samplePayload: Record<string, unknown>;
   groupedVariables: Record<string, IDmnGroupedVariable>;
+}
+
+export interface IBpmnFormField {
+  id: string;
+  label: string;
+  type: string;
+  defaultValue: string;
+  enumValues: Array<{ id: string; name: string }>;
+}
+
+export interface IBpmnStartFormResult {
+  processDefinitionKey: string;
+  processDefinitionName: string;
+  hasFormFields: boolean;
+  formFields: IBpmnFormField[];
+  samplePayload: Record<string, unknown>;
 }

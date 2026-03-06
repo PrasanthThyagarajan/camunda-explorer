@@ -1,15 +1,7 @@
-/**
- * Environments Panel — Presentation layer.
- *
- * SRP: Environment CRUD UI, connection testing, color selection.
- */
-
 import { rawApi } from '../api-client.js';
 import { esc, toast } from '../utils.js';
 import { state, panelLoaders } from '../state.js';
 import { refreshEnvIndicator, refreshCurrentPanel } from '../navigation.js';
-
-// ── Load & Render ───────────────────────────────────────────────────
 
 export async function loadEnvironments() {
   try {
@@ -48,7 +40,6 @@ export async function loadEnvironments() {
     }
     container.innerHTML = html;
 
-    // Auto-test all environments
     for (const env of envs) {
       testEnvById(env.id, true);
     }
@@ -56,8 +47,6 @@ export async function loadEnvironments() {
     document.getElementById('env-cards').innerHTML = `<div class="error-box">${e.message}</div>`;
   }
 }
-
-// ── Save (Create / Update) ──────────────────────────────────────────
 
 export async function saveEnvironment() {
   const editId = document.getElementById('env-edit-id').value;
@@ -90,8 +79,6 @@ export async function saveEnvironment() {
   }
 }
 
-// ── Activate ────────────────────────────────────────────────────────
-
 export async function activateEnv(id) {
   try {
     const result = await rawApi(`/environments/${id}/activate`, { method: 'PUT' });
@@ -106,8 +93,6 @@ export async function activateEnv(id) {
   }
 }
 
-// ── Delete ──────────────────────────────────────────────────────────
-
 export async function deleteEnv(id, name) {
   if (!confirm(`Delete environment "${name}"? This cannot be undone.`)) return;
   try {
@@ -121,8 +106,6 @@ export async function deleteEnv(id, name) {
     toast('Failed: ' + e.message, 'error');
   }
 }
-
-// ── Edit ────────────────────────────────────────────────────────────
 
 export async function editEnv(id) {
   try {
@@ -150,8 +133,6 @@ export async function editEnv(id) {
   } catch (e) { toast('Failed: ' + e.message, 'error'); }
 }
 
-// ── Cancel Edit ─────────────────────────────────────────────────────
-
 export function cancelEnvEdit() {
   document.getElementById('env-edit-id').value = '';
   document.getElementById('env-name').value = '';
@@ -169,15 +150,11 @@ export function cancelEnvEdit() {
   });
 }
 
-// ── Color Selection ─────────────────────────────────────────────────
-
 export function selectEnvColor(el) {
   document.querySelectorAll('.color-opt').forEach(o => o.classList.remove('selected'));
   el.classList.add('selected');
   state.envSelectedColor = el.dataset.color;
 }
-
-// ── Connection Testing ──────────────────────────────────────────────
 
 export async function testEnvConnection() {
   const baseUrl = document.getElementById('env-url').value.trim();
@@ -239,5 +216,4 @@ export async function testEnvById(id, silent) {
   }
 }
 
-// Register in panel loader registry
 panelLoaders.environments = loadEnvironments;

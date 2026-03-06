@@ -1,8 +1,3 @@
-/**
- * Simple logger that writes to stderr (MCP protocol uses stdout for JSON-RPC,
- * so all logging MUST go to stderr).
- */
-
 type LogLevel = "debug" | "info" | "warn" | "error";
 
 const LEVELS: Record<LogLevel, number> = {

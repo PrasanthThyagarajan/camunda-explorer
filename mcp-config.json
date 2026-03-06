@@ -2,7 +2,7 @@
   "mcpServers": {
     "camunda": {
       "command": "node",
-      "args": ["D:/Repostory/AgenticRepo/camunda-mcp-server/dist/index.js"],
+      "args": ["D:/Repostory/AgenticRepo/camunda-explorer/dist/index.js"],
       "env": {
         "CAMUNDA_BASE_URL": "http://localhost:8080/engine-rest",
         "CAMUNDA_USERNAME": "demo",
