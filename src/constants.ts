@@ -3,6 +3,7 @@ export const JSON_BODY_LIMIT = "10mb";
 
 export const DEFAULT_BASE_URL = "http://localhost:8080/engine-rest";
 export const DEFAULT_REQUEST_TIMEOUT = 30000;
+export const MODIFICATION_REQUEST_TIMEOUT = 120000;
 export const CONNECTION_TEST_TIMEOUT = 10000;
 export const DEFAULT_MAX_RESULTS = 100;
 

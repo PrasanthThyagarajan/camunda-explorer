@@ -5,6 +5,7 @@ import { parseFirstActivity, parseAllActivities, parseStartFormFields, parseDmnI
 import { IncidentService } from "../services/incident.service.js";
 import { buildCamundaClient } from "../services/camunda-client.factory.js";
 import type { EnvironmentService } from "../services/environment.service.js";
+import { MODIFICATION_REQUEST_TIMEOUT } from "../constants.js";
 
 export function createActionsRoutes(
   envService: EnvironmentService,
@@ -12,10 +13,10 @@ export function createActionsRoutes(
 ): Router {
   const router = Router();
 
-  function getClient(): AxiosInstance {
+  function getClient(timeoutOverride?: number): AxiosInstance {
     const env = envService.getActive();
     if (!env) throw Object.assign(new Error("No active environment"), { statusCode: 503 });
-    return buildCamundaClient(env);
+    return buildCamundaClient(env, timeoutOverride);
   }
 
   router.get(
@@ -159,7 +160,7 @@ export function createActionsRoutes(
   router.post(
     "/batch-modify-to-start",
     asyncHandler(async (req, res) => {
-      const client = getClient();
+      const client = getClient(MODIFICATION_REQUEST_TIMEOUT);
       const { incidentIds, batchSize, targetActivityId } = req.body;
       if (!incidentIds || !Array.isArray(incidentIds) || incidentIds.length === 0) {
         return res.status(400).json({ error: "incidentIds array is required" });
@@ -175,7 +176,7 @@ export function createActionsRoutes(
   router.post(
     "/batch-resolve",
     asyncHandler(async (req, res) => {
-      const client = getClient();
+      const client = getClient(MODIFICATION_REQUEST_TIMEOUT);
       const { incidentIds, batchSize, strategy } = req.body;
       if (!incidentIds || !Array.isArray(incidentIds) || incidentIds.length === 0) {
         return res.status(400).json({ error: "incidentIds array is required" });
@@ -188,7 +189,7 @@ export function createActionsRoutes(
   router.post(
     "/batch-retry",
     asyncHandler(async (req, res) => {
-      const client = getClient();
+      const client = getClient(MODIFICATION_REQUEST_TIMEOUT);
       const { incidentIds, batchSize, retries } = req.body;
       if (!incidentIds || !Array.isArray(incidentIds) || incidentIds.length === 0) {
         return res.status(400).json({ error: "incidentIds array is required" });

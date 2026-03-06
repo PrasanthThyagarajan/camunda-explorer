@@ -2,10 +2,10 @@ import axios, { AxiosInstance } from "axios";
 import type { ICamundaEnvironment } from "../interfaces/environment.js";
 import { DEFAULT_REQUEST_TIMEOUT, CONNECTION_TEST_TIMEOUT } from "../constants.js";
 
-export function buildCamundaClient(env: ICamundaEnvironment): AxiosInstance {
+export function buildCamundaClient(env: ICamundaEnvironment, timeoutOverride?: number): AxiosInstance {
   return axios.create({
     baseURL: env.baseUrl,
-    timeout: DEFAULT_REQUEST_TIMEOUT,
+    timeout: timeoutOverride ?? DEFAULT_REQUEST_TIMEOUT,
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     auth:
       env.username && env.password
