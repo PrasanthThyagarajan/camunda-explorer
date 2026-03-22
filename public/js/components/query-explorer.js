@@ -306,7 +306,7 @@ function renderQeResults(data) {
         return '<span class="tag tag-gray">' + esc(str) + '</span>';
       }
       if (k === 'activityType') {
-        const colors = { serviceTask: '#3b82f6', userTask: '#22c55e', startEvent: '#14b8a6', endEvent: '#ef4444', exclusiveGateway: '#eab308', parallelGateway: '#eab308' };
+        const colors = { serviceTask: 'var(--blue)', userTask: 'var(--green)', startEvent: 'var(--blue)', endEvent: 'var(--red)', exclusiveGateway: 'var(--yellow)', parallelGateway: 'var(--yellow)' };
         const c = colors[str] || 'var(--text3)';
         return `<span style="color:${c};font-weight:600;font-size:11px">${esc(str)}</span>`;
       }

@@ -1,39 +1,96 @@
 import { api } from '../api-client.js';
 import { esc, shortId, shortMsg, fmtDate, copyBtn, buildTable, toast } from '../utils.js';
-import { panelLoaders } from '../state.js';
 import { openDetail } from '../detail-panel.js';
 
-export async function loadJobs() {
+/* ── Popup state ─────────────────────────────────────────────── */
+
+let currentInstanceId = null;
+
+/* ── Open / Close ────────────────────────────────────────────── */
+
+export function openJobsPopup(instanceId) {
+  currentInstanceId = instanceId || null;
+  const title = document.getElementById('jobs-dialog-title');
+  title.textContent = instanceId
+    ? `🔄 Jobs — ${shortId(instanceId)}`
+    : '🔄 Jobs';
+  document.getElementById('jobs-overlay').classList.add('visible');
+  refreshJobsPopup();
+}
+
+export function closeJobsPopup() {
+  document.getElementById('jobs-overlay').classList.remove('visible');
+  currentInstanceId = null;
+}
+
+/* ── Refresh / Load ──────────────────────────────────────────── */
+
+export async function refreshJobsPopup() {
+  const body = document.getElementById('jobs-popup-body');
+  body.innerHTML = '<div class="empty">Loading…</div>';
+
   try {
     const params = new URLSearchParams();
-    const filter = document.getElementById('job-filter').value;
-    const pi = document.getElementById('job-filter-pi').value;
+    const filter = document.getElementById('jobs-popup-filter').value;
     if (filter === 'noRetries') params.set('noRetriesLeft', 'true');
     if (filter === 'withException') params.set('withException', 'true');
-    if (pi) params.set('processInstanceId', pi);
+    if (currentInstanceId) params.set('processInstanceId', currentInstanceId);
     params.set('maxResults', '100');
 
     const data = await api('/job?' + params);
-    const cols = [
-      { key: 'id', label: 'Job ID', render: r => `<a href="#" onclick="showJobDetail('${r.id}');return false">${shortId(r.id)}</a>`, copyVal: r => r.id },
-      { key: 'processInstanceId', label: 'Instance', render: r => shortId(r.processInstanceId), copyVal: r => r.processInstanceId },
-      { key: 'activityId', label: 'Activity' },
-      { key: 'retries', label: 'Retries', render: r => r.retries === 0 ? '<span class="tag tag-red">0</span>' : r.retries, noCopy: true },
-      { key: 'exceptionMessage', label: 'Error', render: r => `<span title="${esc(r.exceptionMessage)}">${shortMsg(r.exceptionMessage, 50)}</span>`, copyVal: r => r.exceptionMessage },
-      { key: 'dueDate', label: 'Due', render: r => fmtDate(r.dueDate), noCopy: true },
-    ];
-    const actions = r => `
-      <button class="btn btn-success btn-sm" onclick="retryJob('${r.id}')">↻ Retry</button>
-    `;
-    document.getElementById('jobs-table').innerHTML = buildTable(cols, data, actions);
-  } catch (e) { document.getElementById('jobs-table').innerHTML = `<div class="error-box">${e.message}</div>`; }
+
+    if (data.length === 0) {
+      body.innerHTML = '<div class="empty">No jobs found.</div>';
+      return;
+    }
+
+    let html = `<div class="jobs-count">${data.length} job${data.length !== 1 ? 's' : ''}</div>`;
+    html += '<div class="jobs-list">';
+
+    for (const job of data) {
+      const hasError = job.exceptionMessage;
+      const retriesTag = job.retries === 0
+        ? '<span class="tag tag-red">0 retries</span>'
+        : `<span class="tag">${job.retries} retries</span>`;
+      const statusTag = job.suspended
+        ? '<span class="tag tag-yellow">Suspended</span>'
+        : hasError
+          ? '<span class="tag tag-red">Failed</span>'
+          : '<span class="tag tag-green">Active</span>';
+
+      html += `<div class="jobs-card ${hasError ? 'jobs-card-error' : ''}">
+        <div class="jobs-card-header">
+          <div class="jobs-card-id">
+            <a href="#" onclick="showJobDetail('${job.id}');return false">${shortId(job.id)}</a>
+            ${copyBtn(job.id)}
+          </div>
+          <div class="jobs-card-tags">${statusTag} ${retriesTag}</div>
+        </div>
+        ${job.activityId ? `<div class="jobs-card-activity">${esc(job.activityId)}</div>` : ''}
+        ${hasError ? `<div class="jobs-card-error-msg" title="${esc(job.exceptionMessage)}">${esc(shortMsg(job.exceptionMessage, 100))}</div>` : ''}
+        ${job.dueDate ? `<div class="jobs-card-due">Due: ${fmtDate(job.dueDate)}</div>` : ''}
+        <div class="jobs-card-actions">
+          <button class="btn btn-success btn-sm" onclick="retryJob('${job.id}')">↻ Retry</button>
+          <button class="btn btn-primary btn-sm" onclick="executeJob('${job.id}')">▶ Execute</button>
+          <button class="btn btn-outline btn-sm" onclick="showJobDetail('${job.id}')">Details</button>
+        </div>
+      </div>`;
+    }
+
+    html += '</div>';
+    body.innerHTML = html;
+  } catch (e) {
+    body.innerHTML = `<div class="error-box">${esc(e.message)}</div>`;
+  }
 }
+
+/* ── Job Actions ─────────────────────────────────────────────── */
 
 export async function retryJob(jobId) {
   try {
     await api(`/job/${jobId}/retries`, { method: 'PUT', body: { retries: 1 } });
     toast('Job retries set to 1', 'success');
-    setTimeout(loadJobs, 1000);
+    setTimeout(refreshJobsPopup, 800);
   } catch (e) { toast('Failed: ' + e.message, 'error'); }
 }
 
@@ -75,7 +132,7 @@ export async function setJobRetries(id) {
   try {
     await api(`/job/${id}/retries`, { method: 'PUT', body: { retries } });
     toast(`Retries set to ${retries}`, 'success');
-    setTimeout(loadJobs, 500);
+    setTimeout(refreshJobsPopup, 500);
   } catch (e) { toast('Failed: ' + e.message, 'error'); }
 }
 
@@ -83,8 +140,6 @@ export async function executeJob(id) {
   try {
     await api(`/job/${id}/execute`, { method: 'POST', body: {} });
     toast('Job executed', 'success');
-    setTimeout(loadJobs, 500);
+    setTimeout(refreshJobsPopup, 500);
   } catch (e) { toast('Failed: ' + e.message, 'error'); }
 }
-
-panelLoaders.jobs = loadJobs;

@@ -5,57 +5,123 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Camunda Explorer — v7.16.0</title>
   <link rel="stylesheet" href="/css/styles.css" />
+  <script>
+    (function() {
+      var t = localStorage.getItem('camunda-explorer-theme');
+      if (t !== 'dark' && t !== 'light') t = 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
 </head>
 <body>
 
 <!-- ═══ Sidebar ══════════════════════════════════════════════════ -->
 <div class="sidebar">
   <div class="sidebar-brand">
-    <h1>🔧 Camunda Explorer</h1>
-    <small>Platform v7.16.0</small>
+    <div class="brand-logo-row">
+      <div class="brand-logo-mark">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L2 7l10 5 10-5-10-5z" fill="url(#bLogo)" opacity=".95"/>
+          <path d="M2 17l10 5 10-5" stroke="url(#bLogo)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/>
+          <path d="M2 12l10 5 10-5" stroke="url(#bLogo)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".75"/>
+          <defs><linearGradient id="bLogo" x1="2" y1="2" x2="22" y2="22"><stop stop-color="#fc5d0d"/><stop offset="1" stop-color="#fd7e3b"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">Camunda</span>
+        <span class="brand-product">Explorer</span>
+      </div>
+      <span class="brand-version-badge">v7.16</span>
+    </div>
   </div>
 
-  <!-- Environment Quick-Switch -->
-  <div class="sidebar-env" onclick="switchPanel('environments')" title="Click to manage environments">
-    <div class="sidebar-env-label">Environment</div>
-    <div class="sidebar-env-name">
-      <div class="env-dot" id="sidebar-env-dot" style="background:#3b82f6"></div>
-      <span id="sidebar-env-name">Loading…</span>
-    </div>
-    <div class="sidebar-env-url" id="sidebar-env-url"></div>
-  </div>
+  <span id="sidebar-env-url" style="display:none"></span>
+  <span id="sidebar-env-dot" style="display:none"></span>
+  <span id="sidebar-env-name" style="display:none"></span>
 
   <div class="sidebar-nav">
+    <!-- Intelligence — Featured -->
+    <div class="nav-group">
+      <div class="nav-item nav-item-intelligence" data-panel="intelligence" onclick="switchPanel('intelligence')">
+        <div class="nav-intel-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-7 7c0 3 2 5.5 5 7v4h4v-4c3-1.5 5-4 5-7a7 7 0 0 0-7-7z"/><line x1="10" y1="22" x2="14" y2="22"/></svg>
+        </div>
+        <div class="nav-intel-text">
+          <span class="nav-intel-label">Intelligence</span>
+          <span class="nav-intel-sub">Deep Process Analysis</span>
+        </div>
+      </div>
+    </div>
+
     <div class="nav-group">
       <div class="nav-group-title">Overview</div>
-      <div class="nav-item active" data-panel="health" onclick="switchPanel('health')">📊 Engine Health</div>
+      <div class="nav-item active" data-panel="health" onclick="switchPanel('health')">
+        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 3v18h18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M7 14l4-4 4 4 5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Engine Health
+      </div>
     </div>
     <div class="nav-group">
       <div class="nav-group-title">Operations</div>
-      <div class="nav-item" data-panel="incidents" onclick="switchPanel('incidents')">🔴 Incidents <span class="badge" id="badge-incidents" style="display:none">0</span></div>
-      <div class="nav-item" data-panel="instances" onclick="switchPanel('instances')">⚙️ Process Instances</div>
-      <div class="nav-item" data-panel="jobs" onclick="switchPanel('jobs')">🔄 Jobs <span class="badge" id="badge-jobs" style="display:none">0</span></div>
+      <div class="nav-item" data-panel="incidents" onclick="switchPanel('incidents')">
+        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r=".5" fill="currentColor" stroke="currentColor" stroke-width="1"/></svg>
+        Incidents <span class="badge" id="badge-incidents" style="display:none">0</span>
+      </div>
+      <div class="nav-item" data-panel="instances" onclick="switchPanel('instances')">
+        <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" fill="none"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+        Process Instances
+      </div>
     </div>
     <div class="nav-group">
       <div class="nav-group-title">Definitions</div>
-      <div class="nav-item" data-panel="dmn" onclick="switchPanel('dmn')">📋 DMN Evaluate</div>
-      <div class="nav-item" data-panel="definitions" onclick="switchPanel('definitions')">📄 Process Definitions</div>
-      <div class="nav-item" data-panel="deployments" onclick="switchPanel('deployments')">📦 Deployments</div>
+      <div class="nav-item" data-panel="dmn" onclick="switchPanel('dmn')">
+        <svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2" fill="none"/><line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" stroke-width="2"/><line x1="3" y1="15" x2="21" y2="15" stroke="currentColor" stroke-width="2"/><line x1="9" y1="3" x2="9" y2="21" stroke="currentColor" stroke-width="2"/></svg>
+        DMN Evaluate
+      </div>
+      <div class="nav-item" data-panel="definitions" onclick="switchPanel('definitions')">
+        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Process Definitions
+      </div>
+      <div class="nav-item" data-panel="deployments" onclick="switchPanel('deployments')">
+        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><polyline points="3.27,6.96 12,12.01 20.73,6.96" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Deployments
+      </div>
     </div>
     <div class="nav-group">
       <div class="nav-group-title">Workspace</div>
-      <div class="nav-item" data-panel="tasks" onclick="switchPanel('tasks')">✅ User Tasks</div>
-      <div class="nav-item" data-panel="history" onclick="switchPanel('history')">📜 History</div>
-      <div class="nav-item" data-panel="maintenance" onclick="switchPanel('maintenance')">🧹 Maintenance</div>
+      <div class="nav-item" data-panel="tasks" onclick="switchPanel('tasks')">
+        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        User Tasks
+      </div>
+      <div class="nav-item" data-panel="history" onclick="switchPanel('history')">
+        <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/><polyline points="12,6 12,12 16,14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        History
+      </div>
+      <div class="nav-item" data-panel="maintenance" onclick="switchPanel('maintenance')">
+        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Maintenance
+      </div>
     </div>
     <div class="nav-group">
       <div class="nav-group-title">Settings</div>
-      <div class="nav-item" data-panel="environments" onclick="switchPanel('environments')">🌐 Environments</div>
+      <div class="nav-item" data-panel="environments" onclick="switchPanel('environments')">
+        <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/><line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="2"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+        Environments
+      </div>
     </div>
   </div>
   <div class="sidebar-footer">
-    <span class="status-dot" id="engine-status"></span>
-    <span id="engine-label">Checking engine…</span>
+    <div class="footer-engine-status">
+      <span class="status-dot" id="engine-status"></span>
+      <span id="engine-label">Checking engine…</span>
+    </div>
+    <button class="theme-toggle-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark theme" aria-label="Toggle theme">
+      <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+      <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+    </button>
   </div>
 </div>
 
@@ -63,7 +129,7 @@
 <div class="main">
   <div class="topbar">
     <h2 id="topbar-title">Engine Health</h2>
-    <span class="pill" id="topbar-env">
+    <span class="pill" id="topbar-env" onclick="switchPanel('environments')" style="cursor:pointer">
       <span class="env-dot-sm" id="topbar-env-dot" style="background:#3b82f6"></span>
       <span id="topbar-env-name">—</span>
     </span>
@@ -129,8 +195,9 @@
     <!-- ── Health Panel ──────────────────────────────── -->
     <div class="panel active" id="panel-health">
       <div class="stats-row" id="health-stats"></div>
-      <div class="section-title">Process Statistics</div>
-      <div class="table-wrap" id="health-table"></div>
+
+      <!-- ── Old Version Instances Alert ─────────────── -->
+      <div id="health-old-version" style="display:none"></div>
 
       <!-- ── API Query Explorer ──────────────────────── -->
       <div class="qe-container">
@@ -230,6 +297,9 @@
           </div>
         </div>
       </div>
+
+      <div class="section-title">Process Statistics</div>
+      <div class="table-wrap" id="health-table"></div>
     </div>
 
     <!-- ── Incidents Panel ───────────────────────────── -->
@@ -281,15 +351,21 @@
     <!-- ── Process Instances Panel ────────────────────── -->
     <div class="panel" id="panel-instances">
       <div class="form-row mb-16">
-        <div class="form-group">
-          <label>Def Key</label>
-          <input type="text" id="pi-filter-key" placeholder="Process definition key…" />
+        <div class="form-group" style="flex:1.5;min-width:220px">
+          <label>Instance ID(s)</label>
+          <input type="text" id="pi-filter-ids" placeholder="Comma-separated IDs…" />
         </div>
-        <div class="form-group">
+        <div class="form-group" style="flex:1.5;min-width:220px">
+          <label>BPMN Process</label>
+          <select id="pi-filter-procdef" onchange="loadInstances()">
+            <option value="">All Processes</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1;min-width:160px">
           <label>Business Key</label>
           <input type="text" id="pi-filter-bk" placeholder="Business key…" />
         </div>
-        <div class="form-group">
+        <div class="form-group" style="flex:0.8;min-width:140px">
           <label>State</label>
           <select id="pi-filter-state">
             <option value="">All</option>
@@ -306,27 +382,25 @@
       <div class="table-wrap" id="instances-table"></div>
     </div>
 
-    <!-- ── Jobs Panel ────────────────────────────────── -->
-    <div class="panel" id="panel-jobs">
-      <div class="form-row mb-16">
-        <div class="form-group">
-          <label>Filter</label>
-          <select id="job-filter" onchange="loadJobs()">
+    <!-- Jobs popup overlay (accessed from Process Instances detail) -->
+    <div class="jobs-overlay" id="jobs-overlay">
+      <div class="jobs-dialog">
+        <div class="jobs-dialog-header">
+          <h3 id="jobs-dialog-title">🔄 Jobs</h3>
+          <button class="close-btn" onclick="closeJobsPopup()">✕</button>
+        </div>
+        <div class="jobs-dialog-toolbar">
+          <select id="jobs-popup-filter" onchange="refreshJobsPopup()">
             <option value="">All Jobs</option>
-            <option value="noRetries" selected>Failed (0 retries)</option>
+            <option value="noRetries">Failed (0 retries)</option>
             <option value="withException">With Exception</option>
           </select>
+          <button class="btn btn-primary btn-sm" onclick="refreshJobsPopup()">Refresh</button>
         </div>
-        <div class="form-group">
-          <label>Process Instance</label>
-          <input type="text" id="job-filter-pi" placeholder="Filter by instance…" />
-        </div>
-        <div class="form-group" style="justify-content:flex-end">
-          <label>&nbsp;</label>
-          <button class="btn btn-primary" onclick="loadJobs()">Search</button>
+        <div class="jobs-dialog-body" id="jobs-popup-body">
+          <div class="empty">Loading…</div>
         </div>
       </div>
-      <div class="table-wrap" id="jobs-table"></div>
     </div>
 
     <!-- ── DMN Panel ─────────────────────────────────── -->
@@ -489,6 +563,16 @@
           <input type="text" id="hist-filter-pi" placeholder="Instance ID…" />
         </div>
         <div class="form-group">
+          <label>Definition Key</label>
+          <select id="hist-filter-defkey">
+            <option value="">All Definitions</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Business Key</label>
+          <input type="text" id="hist-filter-bizkey" placeholder="e.g. ORDER-123" />
+        </div>
+        <div class="form-group">
           <label>State</label>
           <select id="hist-filter-state">
             <option value="">All</option>
@@ -502,6 +586,13 @@
         </div>
       </div>
       <div class="table-wrap" id="history-table"></div>
+    </div>
+
+    <!-- ── Intelligence Panel ──────────────────────────── -->
+    <div class="panel" id="panel-intelligence">
+      <div id="intel-content">
+        <div class="intel-loading">Loading intelligence engine…</div>
+      </div>
     </div>
 
   </div>
@@ -537,9 +628,11 @@
   <div class="modify-dialog">
     <h3 id="modify-dialog-title">⇄ Modify Incident</h3>
     <div class="modify-subtitle" id="modify-dialog-subtitle">Select target activity to move the process instance to</div>
-    <div id="modify-dialog-info" class="modify-info"></div>
-    <div id="modify-dialog-body" class="modify-target-section">
-      <div class="modify-loading">Loading BPMN activities…</div>
+    <div class="modify-dialog-scrollbody">
+      <div id="modify-dialog-info" class="modify-info"></div>
+      <div id="modify-dialog-body">
+        <div class="modify-loading">Loading BPMN activities…</div>
+      </div>
     </div>
     <div class="modify-actions">
       <button class="btn btn-outline" onclick="closeModifyDialog()">Cancel</button>
@@ -572,6 +665,86 @@
       <button class="btn btn-primary" id="start-dialog-confirm" onclick="confirmStartInstance()">▶ Start Instance</button>
     </div>
   </div>
+</div>
+
+<!-- ═══ History Track Popup ═══════════════════════════════════════ -->
+<div class="history-track-overlay" id="history-track-overlay" onclick="if(event.target===this)closeHistoryTrack()">
+  <div class="history-track-dialog">
+    <div class="track-header">
+      <div class="track-header-top">
+        <h3 id="track-title">Process Track</h3>
+        <button class="track-close" onclick="closeHistoryTrack()">✕</button>
+      </div>
+      <div class="track-subtitle" id="track-subtitle"></div>
+      <div id="track-header-info"></div>
+    </div>
+    <div class="track-tabs-bar" id="track-tabs-bar"></div>
+    <div class="track-tabs-content" id="track-tabs-content">
+      <div class="track-loading">Select an instance to view its execution track.</div>
+    </div>
+    <div class="track-footer">
+      <button class="btn btn-outline btn-sm hist-track-btn" onclick="exportTrackJson()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export JSON</button>
+      <button class="btn btn-outline btn-sm" onclick="closeHistoryTrack()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Diagnosis Overlay ═══════════════════════════════════════ -->
+<div class="dx-overlay" id="diagnosis-overlay" style="display:none" onclick="if(event.target===this)closeDiagnosis()">
+  <div class="dx-dialog">
+    <div class="dx-header">
+      <div class="dx-header-left">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-7 7c0 3 2 5.5 5 7v4h4v-4c3-1.5 5-4 5-7a7 7 0 0 0-7-7z"/><line x1="10" y1="22" x2="14" y2="22"/></svg>
+        <h3>Process Diagnosis</h3>
+      </div>
+      <button class="dx-close" onclick="closeDiagnosis()">✕</button>
+    </div>
+    <div class="dx-body" id="dx-body">
+      <div class="dx-loading">Initializing…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Stacktrace Viewer Modal ═════════════════════════════════ -->
+<div class="st-overlay" id="stacktrace-overlay" style="display:none" onclick="if(event.target===this)closeStacktraceViewer()">
+  <div class="st-dialog">
+    <div class="st-header">
+      <div class="st-header-left">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/></svg>
+        <h3 id="st-viewer-title">Stacktrace</h3>
+      </div>
+      <div class="st-header-right">
+        <button class="st-copy-btn" id="st-copy-btn" onclick="copyStacktraceToClipboard()" title="Copy to clipboard">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span>Copy</span>
+        </button>
+        <button class="st-close" onclick="closeStacktraceViewer()">✕</button>
+      </div>
+    </div>
+    <div class="st-body">
+      <pre class="st-pre" id="st-viewer-body"></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Migration Overlay ═══════════════════════════════════════ -->
+<div class="mig-overlay" id="migration-overlay" onclick="if(event.target===this)closeMigrationOverlay()">
+  <div class="mig-dialog">
+    <div class="mig-header">
+      <div class="mig-header-left">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3v18"/><path d="M7 3v18"/><path d="m3 7 4-4 4 4"/><path d="m13 17 4 4 4-4"/></svg>
+        <h3>Version Migration</h3>
+      </div>
+      <button class="mig-close" onclick="closeMigrationOverlay()">✕</button>
+    </div>
+    <div class="mig-body" id="migration-body">
+      <div class="mig-loading">Loading migration data…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Migration Confirmation Dialog -->
+<div class="mig-confirm-overlay" id="migration-confirm-overlay" onclick="if(event.target===this)closeMigrationConfirm()">
 </div>
 
 <!-- ═══ Toast Container ══════════════════════════════════════════ -->

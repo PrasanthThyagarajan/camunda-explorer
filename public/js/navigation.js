@@ -2,6 +2,8 @@ import { state, panelLoaders, sidebarRefreshers, PANEL_TITLES } from './state.js
 import { api, rawApi } from './api-client.js';
 
 export function switchPanel(id) {
+  closeAllOverlays();
+
   state.currentPanel = id;
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel-' + id).classList.add('active');
@@ -10,6 +12,34 @@ export function switchPanel(id) {
   );
   document.getElementById('topbar-title').textContent = PANEL_TITLES[id] || id;
   refreshCurrentPanel();
+}
+
+function closeAllOverlays() {
+  // Class-toggled overlays
+  const classOverlays = [
+    { id: 'detail-panel',             cls: 'open' },
+    { id: 'jobs-overlay',             cls: 'visible' },
+    { id: 'progress-overlay',         cls: 'visible' },
+    { id: 'modify-dialog-overlay',    cls: 'visible' },
+    { id: 'start-dialog-overlay',     cls: 'visible' },
+    { id: 'history-track-overlay',    cls: 'open' },
+    { id: 'migration-overlay',        cls: 'open' },
+    { id: 'migration-confirm-overlay',cls: 'open' },
+  ];
+  for (const { id, cls } of classOverlays) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove(cls);
+  }
+
+  // Style-toggled overlays
+  const styleOverlays = ['diagnosis-overlay', 'stacktrace-overlay', 'dx-confirm-overlay'];
+  for (const id of styleOverlays) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  }
+
+  // Restore body scroll
+  document.body.style.overflow = '';
 }
 
 export function refreshCurrentPanel() {
@@ -32,7 +62,6 @@ export async function refreshSidebarBadges() {
       (s.incidents || []).forEach(i => totalIncidents += i.incidentCount || 0);
     });
     updateBadge('incidents', totalIncidents);
-    updateBadge('jobs', totalFailed);
     setEngineStatus(true);
   } catch (_) {
     setEngineStatus(false);
@@ -41,6 +70,7 @@ export async function refreshSidebarBadges() {
 
 export function updateBadge(id, count) {
   const el = document.getElementById('badge-' + id);
+  if (!el) return;
   if (count > 0) { el.style.display = ''; el.textContent = count; }
   else { el.style.display = 'none'; }
 }

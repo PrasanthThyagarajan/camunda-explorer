@@ -96,8 +96,9 @@ export async function loadIncidents() {
     html += '<th>ID</th><th>Process</th><th>Type</th><th>Message</th><th>Activity</th><th>Instance</th><th>Time</th><th>Actions</th>';
     html += '</tr></thead><tbody>';
 
-    incidents.forEach(r => {
+    incidents.forEach((r, idx) => {
       const procName = getProcDefName(r.processDefinitionId);
+      const hasConfig = !!r.configuration;
       html += `<tr>`;
       html += `<td><input type="checkbox" class="inc-checkbox" value="${r.id}" onchange="updateBatchBar()" /></td>`;
       html += `<td><a href="#" onclick="showIncidentDetail('${r.id}');return false">${shortId(r.id)}</a>${copyBtn(r.id)}</td>`;
@@ -110,8 +111,19 @@ export async function loadIncidents() {
       html += `<td>
         <button class="btn btn-success btn-sm" onclick="retryIncident('${r.id}','${r.processInstanceId}','${r.configuration}','${r.incidentType}')">↻ Retry</button>
         <button class="btn btn-primary btn-sm" onclick="modifyIncidentToStart('${r.id}')">⇄ Modify</button>
+        <button class="btn btn-outline btn-sm" style="border-color:var(--primary);color:var(--primary)" onclick="openDiagnosis('${r.processInstanceId}','${r.id}',\`${esc(r.incidentMessage || '').replace(/`/g, '')}\`)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-7 7c0 3 2 5.5 5 7v4h4v-4c3-1.5 5-4 5-7a7 7 0 0 0-7-7z"/><line x1="10" y1="22" x2="14" y2="22"/></svg> Diagnose</button>
+        ${hasConfig ? `<button class="btn btn-outline btn-sm stacktrace-toggle-btn" onclick="toggleStacktrace('${r.configuration}', ${idx}, '${r.incidentType}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/></svg> Stacktrace</button>` : ''}
       </td>`;
       html += `</tr>`;
+      if (hasConfig) {
+        html += `<tr class="stacktrace-row" id="stacktrace-row-${idx}" style="display:none">
+          <td colspan="9">
+            <div class="stacktrace-container" id="stacktrace-content-${idx}">
+              <div class="stacktrace-loading">Loading stacktrace…</div>
+            </div>
+          </td>
+        </tr>`;
+      }
     });
 
     html += '</tbody></table>';
@@ -136,7 +148,6 @@ export async function retryIncident(incidentId, processInstanceId, configuration
       await api(`/job/${configuration}/retries`, { method: 'PUT', body: { retries: 1 } });
       toast('Job retries set to 1 — engine will re-attempt execution', 'success');
     } else {
-      // Unknown type — try job first, then external task as fallback
       try {
         await api(`/job/${configuration}/retries`, { method: 'PUT', body: { retries: 1 } });
         toast('Retries set to 1 — engine will re-attempt', 'success');
@@ -182,22 +193,109 @@ export async function showIncidentDetail(id) {
     </div></div>`;
 
     if (inc.configuration) {
+      let trace = '';
       try {
-        const st = await fetch('/api' + `/job/${inc.configuration}/stacktrace`);
-        if (st.ok) {
-          const trace = await st.text();
-          html += `<div class="detail-section"><h4>Stacktrace</h4><pre class="json">${esc(trace)}</pre></div>`;
+        // Try external task error first
+        if (inc.incidentType === 'failedExternalTask') {
+          const etRes = await fetch('/api/external-task/' + inc.configuration);
+          if (etRes.ok) {
+            const etData = await etRes.json();
+            trace = etData.errorDetails || etData.errorMessage || '';
+          }
+        }
+        // Fall back to job stacktrace (for failedJob or as fallback)
+        if (!trace) {
+          const st = await fetch('/api/job/' + inc.configuration + '/stacktrace');
+          if (st.ok) trace = await st.text();
         }
       } catch (_) {}
+
+      if (trace) {
+        html += `<div class="detail-section">
+          <div class="stacktrace-detail-header" onclick="this.parentElement.classList.toggle('stacktrace-expanded')">
+            <h4 style="margin:0;display:flex;align-items:center;gap:6px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/></svg>
+              Stacktrace
+            </h4>
+            <span class="stacktrace-toggle-label">Click to expand</span>
+            <svg class="stacktrace-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <pre class="stacktrace-detail-pre">${esc(trace)}</pre>
+        </div>`;
+      }
     }
 
     html += `<div class="btn-group" style="flex-wrap:wrap">
       <button class="btn btn-success" onclick="retryIncident('${inc.id}','${inc.processInstanceId}','${inc.configuration}','${inc.incidentType}')">↻ Retry</button>
       <button class="btn btn-primary" onclick="closeDetail();modifyIncidentToStart('${inc.id}')">⇄ Modify</button>
+      <button class="btn btn-outline" style="border-color:var(--primary);color:var(--primary)" onclick="closeDetail();openDiagnosis('${inc.processInstanceId}','${inc.id}','${esc(inc.incidentMessage || '').replace(/'/g, "\\'")}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-7 7c0 3 2 5.5 5 7v4h4v-4c3-1.5 5-4 5-7a7 7 0 0 0-7-7z"/><line x1="10" y1="22" x2="14" y2="22"/></svg> Diagnose</button>
     </div>`;
 
     openDetail('Incident: ' + shortId(inc.id), html);
   } catch (e) { toast('Failed to load: ' + e.message, 'error'); }
+}
+
+// Stacktrace cache to avoid re-fetching
+const stacktraceCache = {};
+
+const ST_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/></svg>`;
+
+function renderStacktraceContent(configId, rowIdx, trace) {
+  return `<div class="stacktrace-header">
+      <span class="stacktrace-title">${ST_ICON} Stacktrace</span>
+      <button class="btn btn-outline btn-sm" onclick="toggleStacktrace('${configId}', ${rowIdx}, '')">Hide</button>
+    </div>
+    <pre class="stacktrace-pre">${esc(trace)}</pre>`;
+}
+
+export async function toggleStacktrace(configId, rowIdx, incidentType) {
+  const row = document.getElementById(`stacktrace-row-${rowIdx}`);
+  if (!row) return;
+
+  const isVisible = row.style.display !== 'none';
+  if (isVisible) {
+    row.style.display = 'none';
+    return;
+  }
+
+  row.style.display = '';
+  const contentEl = document.getElementById(`stacktrace-content-${rowIdx}`);
+
+  // If already fetched, just show
+  if (stacktraceCache[configId]) {
+    contentEl.innerHTML = renderStacktraceContent(configId, rowIdx, stacktraceCache[configId]);
+    return;
+  }
+
+  // Fetch stacktrace
+  contentEl.innerHTML = '<div class="stacktrace-loading">Loading stacktrace…</div>';
+  try {
+    let trace = '';
+
+    if (incidentType === 'failedExternalTask') {
+      // External tasks store error details in the task object
+      const res = await fetch('/api/external-task/' + configId);
+      if (res.ok) {
+        const taskData = await res.json();
+        trace = taskData.errorDetails || taskData.errorMessage || '';
+      }
+    }
+
+    // Try job stacktrace
+    if (!trace) {
+      const res = await fetch('/api/job/' + configId + '/stacktrace');
+      if (res.ok) {
+        trace = await res.text();
+      }
+    }
+
+    if (!trace) throw new Error('empty');
+
+    stacktraceCache[configId] = trace;
+    contentEl.innerHTML = renderStacktraceContent(configId, rowIdx, trace);
+  } catch {
+    contentEl.innerHTML = `<div class="stacktrace-empty">No stacktrace available for this incident.</div>`;
+  }
 }
 
 export function getSelectedIncidentIds() {

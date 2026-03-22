@@ -97,7 +97,38 @@ export function createActionsRoutes(
         parsed.hasFormFields = true;
       }
 
-      res.json(parsed);
+      // Grab variables from the most recent completed instance as a handy reference
+      let historySample: Record<string, unknown> = {};
+      try {
+        const histRes = await client.get(`/history/process-instance`, {
+          params: {
+            processDefinitionKey: key,
+            sortBy: "startTime",
+            sortOrder: "desc",
+            maxResults: 1,
+            finished: true,
+          },
+        });
+        const instances = histRes.data;
+        if (Array.isArray(instances) && instances.length > 0) {
+          const instanceId = instances[0].id;
+          const varRes = await client.get(`/history/variable-instance`, {
+            params: { processInstanceId: instanceId, deserializeValues: false },
+          });
+          const vars = varRes.data;
+          if (Array.isArray(vars)) {
+            for (const v of vars) {
+              // Skip binary/serialized types — only keep simple, readable values
+              if (v.type === "Bytes" || v.type === "File" || v.type === "Object") continue;
+              historySample[v.name] = { value: v.value, type: v.type };
+            }
+          }
+        }
+      } catch {
+        // Not a big deal if history lookup fails — it's just a convenience feature
+      }
+
+      res.json({ ...parsed, historySample });
     })
   );
 

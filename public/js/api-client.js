@@ -1,11 +1,9 @@
 const API_PREFIX = '/api';
 
-/** Fetch from Camunda REST API via the proxy (/api/...). */
 export async function api(path, opts = {}) {
   return _fetch(API_PREFIX + path, opts);
 }
 
-/** Fetch from the dashboard server directly (no /api prefix). */
 export async function rawApi(path, opts = {}) {
   return _fetch(path, opts);
 }
@@ -19,7 +17,7 @@ async function _fetch(url, opts) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.message || err.type || `HTTP ${res.status}`);
+    throw new Error(err.message || err.error || err.type || `HTTP ${res.status}`);
   }
 
   const text = await res.text();
