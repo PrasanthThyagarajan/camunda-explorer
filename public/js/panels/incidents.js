@@ -115,6 +115,7 @@ export async function loadIncidents() {
         ${hasConfig ? `<button class="btn btn-outline btn-sm stacktrace-toggle-btn" onclick="toggleStacktrace('${r.configuration}', ${idx}, '${r.incidentType}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/></svg> Stacktrace</button>` : ''}
       </td>`;
       html += `</tr>`;
+      // Hidden stacktrace row
       if (hasConfig) {
         html += `<tr class="stacktrace-row" id="stacktrace-row-${idx}" style="display:none">
           <td colspan="9">
@@ -148,6 +149,7 @@ export async function retryIncident(incidentId, processInstanceId, configuration
       await api(`/job/${configuration}/retries`, { method: 'PUT', body: { retries: 1 } });
       toast('Job retries set to 1 — engine will re-attempt execution', 'success');
     } else {
+      // Unknown type — try job first, then external task as fallback
       try {
         await api(`/job/${configuration}/retries`, { method: 'PUT', body: { retries: 1 } });
         toast('Retries set to 1 — engine will re-attempt', 'success');
@@ -195,7 +197,7 @@ export async function showIncidentDetail(id) {
     if (inc.configuration) {
       let trace = '';
       try {
-        // Try external task error first
+        // Try external task error details first (for failedExternalTask)
         if (inc.incidentType === 'failedExternalTask') {
           const etRes = await fetch('/api/external-task/' + inc.configuration);
           if (etRes.ok) {
@@ -267,7 +269,7 @@ export async function toggleStacktrace(configId, rowIdx, incidentType) {
     return;
   }
 
-  // Fetch stacktrace
+  // Fetch stacktrace — different endpoints for jobs vs external tasks
   contentEl.innerHTML = '<div class="stacktrace-loading">Loading stacktrace…</div>';
   try {
     let trace = '';
@@ -281,7 +283,7 @@ export async function toggleStacktrace(configId, rowIdx, incidentType) {
       }
     }
 
-    // Try job stacktrace
+    // Try job stacktrace (works for failedJob, also worth trying as fallback)
     if (!trace) {
       const res = await fetch('/api/job/' + configId + '/stacktrace');
       if (res.ok) {

@@ -14,8 +14,8 @@
     "dev:run": "tsx src/index.ts",
     "inspector": "mcp-inspector node dist/index.js",
     "inspector:dev": "mcp-inspector tsx src/index.ts",
-    "dashboard": "tsx src/dashboard/server.ts",
-    "dashboard:build": "tsc && node dist/dashboard/server.js",
+    "dashboard": "tsc && node dist/dashboard/server.js",
+    "dashboard:dev": "tsx src/dashboard/server.ts",
     "lint": "eslint src/",
     "clean": "rimraf dist"
   },

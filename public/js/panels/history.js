@@ -7,6 +7,10 @@ import { showHistoryTrack } from '../components/history-track.js';
 
 let defKeysLoaded = false;
 
+/**
+ * Fetch distinct process definition keys from history and populate
+ * the dropdown. Only runs once per session (cached after first load).
+ */
 async function populateDefKeyDropdown() {
   if (defKeysLoaded) return;
 
@@ -14,6 +18,8 @@ async function populateDefKeyDropdown() {
   if (!select) return;
 
   try {
+    // Fetch a broad set of recent history entries to extract unique keys.
+    // We request a decent batch sorted by most recent to cover active definitions.
     const data = await api('/history/process-instance?sortBy=startTime&sortOrder=desc&maxResults=500');
 
     const keys = new Set();
@@ -21,10 +27,13 @@ async function populateDefKeyDropdown() {
       if (inst.processDefinitionKey) keys.add(inst.processDefinitionKey);
     });
 
+    // Sort alphabetically for easy scanning
     const sorted = [...keys].sort((a, b) => a.localeCompare(b));
 
+    // Preserve the current selection if it exists
     const currentVal = select.value;
 
+    // Clear existing options (keep the "All" placeholder)
     select.innerHTML = '<option value="">All Definitions</option>';
 
     sorted.forEach(key => {
@@ -34,14 +43,18 @@ async function populateDefKeyDropdown() {
       select.appendChild(opt);
     });
 
+    // Restore previous selection if still valid
     if (currentVal && keys.has(currentVal)) {
       select.value = currentVal;
     }
 
     defKeysLoaded = true;
-  } catch { /* noop */ }
+  } catch {
+    // If the history call fails, leave the dropdown with just "All"
+  }
 }
 
+/** Force refresh the definition key list (e.g. after environment switch) */
 export function refreshDefKeyDropdown() {
   defKeysLoaded = false;
   populateDefKeyDropdown();
@@ -50,7 +63,7 @@ export function refreshDefKeyDropdown() {
 // ── History Table ────────────────────────────────────────────────
 
 export async function loadHistory() {
-  // Populate dropdown on first load
+  // Populate the dropdown on first load (non-blocking, runs in background)
   populateDefKeyDropdown();
 
   try {

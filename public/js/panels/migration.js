@@ -1,3 +1,18 @@
+/**
+ * Migration Overlay Module
+ *
+ * Full-featured overlay for reviewing and migrating process instances
+ * that are running on old BPMN versions.
+ *
+ * Flow:
+ *   1. Health panel detects old-version instances and stores breakdown
+ *   2. User clicks "Review & Migrate" → opens this overlay
+ *   3. Overlay shows per-definition cards with instance details
+ *   4. User can expand a definition to see individual instances
+ *   5. Migrate all instances for a definition, or select specific ones
+ *   6. Confirmation dialog → execute via backend → show results
+ */
+
 import { rawApi } from '../api-client.js';
 import { esc, shortId, toast, copyBtn } from '../utils.js';
 
@@ -27,7 +42,7 @@ export function closeMigrationOverlay() {
   selectedInstances.clear();
 }
 
-// ── Refresh ──────────────────────────────────────────────────────
+// ── Refresh overlay with fresh data from the server ─────────────
 
 async function refreshOverlay() {
   try {
@@ -37,6 +52,7 @@ async function refreshOverlay() {
     // If fetch fails, keep existing data
   }
   renderOverlayContent();
+  // Also refresh the health panel so the dashboard card stays in sync
   window.refreshCurrentPanel();
 }
 
@@ -431,6 +447,7 @@ function renderVersionPicker(defKey, sourceDefId, defName, showAll) {
   const hasMore = allVersions.length > INITIAL_VERSION_LIMIT;
   const versions = showAll ? allVersions : allVersions.slice(0, INITIAL_VERSION_LIMIT);
 
+  // Ensure the source version is always visible even if outside the limit
   const sourceInList = versions.some(v => v.id === sourceDefId);
   const sourceEntry = allVersions.find(v => v.id === sourceDefId);
   if (!sourceInList && sourceEntry && !showAll) {

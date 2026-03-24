@@ -10,11 +10,14 @@ import { DEFAULT_DASHBOARD_PORT, JSON_BODY_LIMIT } from "../constants.js";
 import { EnvironmentRepository } from "../repositories/environment.repository.js";
 import { EnvironmentService } from "../services/environment.service.js";
 import { IncidentService } from "../services/incident.service.js";
+import { ProcessInstanceService } from "../services/process-instance.service.js";
 import { errorHandler } from "../middleware/error-handler.js";
 import { createEnvironmentRoutes } from "../routes/environment.routes.js";
 import { createActionsRoutes } from "../routes/actions.routes.js";
 import { createProxyRoutes } from "../routes/proxy.routes.js";
 import { createConfigRoutes } from "../routes/config.routes.js";
+import { createIntelligenceRoutes } from "../routes/intelligence.routes.js";
+import { createMigrationRoutes } from "../routes/migration.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,6 +26,7 @@ const projectRoot = path.resolve(__dirname, "../..");
 const envRepository = new EnvironmentRepository(projectRoot);
 const envService = new EnvironmentService(envRepository);
 const incidentService = new IncidentService();
+const processInstanceService = new ProcessInstanceService();
 
 const app = express();
 app.use(cors());
@@ -32,8 +36,10 @@ const publicDir = path.resolve(projectRoot, "public");
 app.use(express.static(publicDir));
 
 app.use("/environments", createEnvironmentRoutes(envService));
-app.use("/actions", createActionsRoutes(envService, incidentService));
+app.use("/actions", createActionsRoutes(envService, incidentService, processInstanceService));
 app.use("/config", createConfigRoutes(envService));
+app.use("/intelligence", createIntelligenceRoutes(envService));
+app.use("/migration", createMigrationRoutes(envService));
 app.use("/api", createProxyRoutes(envService));
 
 app.get("*", (_req, res) => {

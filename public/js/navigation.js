@@ -2,6 +2,7 @@ import { state, panelLoaders, sidebarRefreshers, PANEL_TITLES } from './state.js
 import { api, rawApi } from './api-client.js';
 
 export function switchPanel(id) {
+  // Close all open overlays, popups, and dialogs before switching
   closeAllOverlays();
 
   state.currentPanel = id;
@@ -14,8 +15,12 @@ export function switchPanel(id) {
   refreshCurrentPanel();
 }
 
+/**
+ * Closes every overlay, popup, dialog, and side panel so the user
+ * starts with a clean slate when navigating to a new section.
+ */
 function closeAllOverlays() {
-  // Class-toggled overlays
+  // Class-toggled overlays  (remove the class that makes them visible)
   const classOverlays = [
     { id: 'detail-panel',             cls: 'open' },
     { id: 'jobs-overlay',             cls: 'visible' },
@@ -31,14 +36,14 @@ function closeAllOverlays() {
     if (el) el.classList.remove(cls);
   }
 
-  // Style-toggled overlays
+  // Style-toggled overlays  (set display to none)
   const styleOverlays = ['diagnosis-overlay', 'stacktrace-overlay', 'dx-confirm-overlay'];
   for (const id of styleOverlays) {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   }
 
-  // Restore body scroll
+  // Restore body scroll in case an overlay locked it
   document.body.style.overflow = '';
 }
 

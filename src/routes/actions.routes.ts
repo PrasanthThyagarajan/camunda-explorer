@@ -3,13 +3,18 @@ import { AxiosInstance } from "axios";
 import { asyncHandler } from "../middleware/error-handler.js";
 import { parseFirstActivity, parseAllActivities, parseStartFormFields, parseDmnInputs, groupDmnInputs, buildSamplePayload } from "../parsers/index.js";
 import { IncidentService } from "../services/incident.service.js";
+import { ProcessInstanceService } from "../services/process-instance.service.js";
 import { buildCamundaClient } from "../services/camunda-client.factory.js";
 import type { EnvironmentService } from "../services/environment.service.js";
 import { MODIFICATION_REQUEST_TIMEOUT } from "../constants.js";
+import { logger } from "../utils/logger.js";
+
+const VALID_INSTRUCTION_TYPES = new Set(["startBeforeActivity", "startAfterActivity"]);
 
 export function createActionsRoutes(
   envService: EnvironmentService,
-  incidentService: IncidentService
+  incidentService: IncidentService,
+  processInstanceService: ProcessInstanceService
 ): Router {
   const router = Router();
 
@@ -97,38 +102,7 @@ export function createActionsRoutes(
         parsed.hasFormFields = true;
       }
 
-      // Grab variables from the most recent completed instance as a handy reference
-      let historySample: Record<string, unknown> = {};
-      try {
-        const histRes = await client.get(`/history/process-instance`, {
-          params: {
-            processDefinitionKey: key,
-            sortBy: "startTime",
-            sortOrder: "desc",
-            maxResults: 1,
-            finished: true,
-          },
-        });
-        const instances = histRes.data;
-        if (Array.isArray(instances) && instances.length > 0) {
-          const instanceId = instances[0].id;
-          const varRes = await client.get(`/history/variable-instance`, {
-            params: { processInstanceId: instanceId, deserializeValues: false },
-          });
-          const vars = varRes.data;
-          if (Array.isArray(vars)) {
-            for (const v of vars) {
-              // Skip binary/serialized types — only keep simple, readable values
-              if (v.type === "Bytes" || v.type === "File" || v.type === "Object") continue;
-              historySample[v.name] = { value: v.value, type: v.type };
-            }
-          }
-        }
-      } catch {
-        // Not a big deal if history lookup fails — it's just a convenience feature
-      }
-
-      res.json({ ...parsed, historySample });
+      res.json(parsed);
     })
   );
 
@@ -165,8 +139,8 @@ export function createActionsRoutes(
       const decisionKey = req.params.decisionKey;
       const body = req.body;
 
-      console.log(`[DMN-TEST] POST /decision-definition/key/${decisionKey}/evaluate`);
-      console.log(`[DMN-TEST] Body: ${JSON.stringify(body, null, 2)}`);
+      logger.info(`[DMN-TEST] POST /decision-definition/key/${decisionKey}/evaluate`);
+      logger.debug(`[DMN-TEST] Body`, body);
 
       try {
         const response = await client.post(
@@ -177,7 +151,7 @@ export function createActionsRoutes(
         res.json({ success: true, status: response.status, data: response.data });
       } catch (error: unknown) {
         const err = error as { response?: { status?: number; data?: unknown }; message?: string };
-        console.error(`[DMN-TEST] Error: ${err.response?.status} ${JSON.stringify(err.response?.data)}`);
+        logger.error(`[DMN-TEST] Error: ${err.response?.status}`, err.response?.data);
         res.status(err.response?.status || 500).json({
           success: false,
           status: err.response?.status,
@@ -199,7 +173,7 @@ export function createActionsRoutes(
       const result = await incidentService.batchModifyToStart(
         client, incidentIds, batchSize, targetActivityId
       );
-      console.log(`[BATCH] Modify complete: ${result.succeeded}/${result.total} succeeded`);
+      logger.info(`[BATCH] Modify complete: ${result.succeeded}/${result.total} succeeded`);
       res.json(result);
     })
   );
@@ -235,6 +209,121 @@ export function createActionsRoutes(
     asyncHandler(async (_req, res) => {
       const client = getClient();
       const result = await incidentService.findDuplicates(client);
+      res.json(result);
+    })
+  );
+
+  // ── History Track route ──────────────────────────────────────────
+
+  router.get(
+    "/history-track/:instanceId",
+    asyncHandler(async (req, res) => {
+      const client = getClient();
+      const track = await processInstanceService.getHistoryTrack(
+        client, req.params.instanceId
+      );
+      res.json(track);
+    })
+  );
+
+  // ── Process Instance Modify routes ──────────────────────────────
+
+  router.get(
+    "/instance-context/:instanceId",
+    asyncHandler(async (req, res) => {
+      const client = getClient();
+      const context = await processInstanceService.getInstanceContext(
+        client, req.params.instanceId
+      );
+      res.json(context);
+    })
+  );
+
+  router.post(
+    "/instance-modify",
+    asyncHandler(async (req, res) => {
+      const client = getClient(MODIFICATION_REQUEST_TIMEOUT);
+      const {
+        instanceId,
+        cancelActivityIds,
+        targetActivityId,
+        instructionType,
+        skipCustomListeners,
+        skipIoMappings,
+        annotation,
+      } = req.body;
+
+      if (!instanceId || typeof instanceId !== "string") {
+        return res.status(400).json({ error: "instanceId (string) is required" });
+      }
+      if (!targetActivityId || typeof targetActivityId !== "string") {
+        return res.status(400).json({ error: "targetActivityId (string) is required" });
+      }
+      if (!Array.isArray(cancelActivityIds) || cancelActivityIds.length === 0) {
+        return res.status(400).json({ error: "cancelActivityIds must be a non-empty array of strings" });
+      }
+      if (instructionType && !VALID_INSTRUCTION_TYPES.has(instructionType)) {
+        return res.status(400).json({ error: `Invalid instructionType. Must be one of: ${[...VALID_INSTRUCTION_TYPES].join(", ")}` });
+      }
+
+      const result = await processInstanceService.modifyInstance(
+        client,
+        instanceId,
+        cancelActivityIds,
+        targetActivityId,
+        {
+          instructionType: instructionType || "startBeforeActivity",
+          skipCustomListeners: !!skipCustomListeners,
+          skipIoMappings: !!skipIoMappings,
+          annotation: typeof annotation === "string" ? annotation : undefined,
+        }
+      );
+
+      logger.info(`[INSTANCE-MODIFY] ${instanceId}: ${result.status} — ${result.message}`);
+      res.json(result);
+    })
+  );
+
+  router.post(
+    "/batch-instance-modify",
+    asyncHandler(async (req, res) => {
+      const client = getClient(MODIFICATION_REQUEST_TIMEOUT);
+      const {
+        instanceIds,
+        targetActivityId,
+        batchSize,
+        instructionType,
+        skipCustomListeners,
+        skipIoMappings,
+        annotation,
+      } = req.body;
+
+      if (!Array.isArray(instanceIds) || instanceIds.length === 0) {
+        return res.status(400).json({ error: "instanceIds must be a non-empty array" });
+      }
+      if (!targetActivityId || typeof targetActivityId !== "string") {
+        return res.status(400).json({ error: "targetActivityId (string) is required" });
+      }
+      if (instructionType && !VALID_INSTRUCTION_TYPES.has(instructionType)) {
+        return res.status(400).json({ error: `Invalid instructionType. Must be one of: ${[...VALID_INSTRUCTION_TYPES].join(", ")}` });
+      }
+
+      const safeBatchSize = typeof batchSize === "number" && batchSize > 0 ? batchSize : undefined;
+
+      const result = await processInstanceService.batchModifyInstances(
+        client,
+        instanceIds,
+        targetActivityId,
+        safeBatchSize,
+        {
+          instructionType: instructionType || "startBeforeActivity",
+          skipCustomListeners: !!skipCustomListeners,
+          skipIoMappings: !!skipIoMappings,
+          annotation: typeof annotation === "string" ? annotation : undefined,
+        }
+      );
+
+      logger.info(`[BATCH-INSTANCE-MODIFY] ${result.succeeded}/${result.total} succeeded`);
       res.json(result);
     })
   );

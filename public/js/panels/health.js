@@ -7,7 +7,7 @@ export async function loadHealth() {
   try {
     const allStats = await api('/process-definition/statistics?failedJobs=true&incidents=true');
 
-    // Latest version per definition key
+    // Keep only the latest deployed version of each definition key
     const latestByKey = new Map();
     for (const s of allStats) {
       const key = s.definition?.key || s.id.split(':')[0];
@@ -38,25 +38,26 @@ export async function loadHealth() {
     const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
     const [timerRes, suspRes, idleRes, msgSubs] = await Promise.all([
-      // Timer jobs
+      // Timer jobs — POST lets us filter by processDefinitionKeyIn
       api('/job/count', {
         method: 'POST',
         body: { timers: true, processDefinitionKeyIn: latestKeys },
       }).catch(() => ({ count: 0 })),
 
-      // Suspended jobs
+      // Suspended jobs — scoped to latest definitions
       api('/job/count', {
         method: 'POST',
         body: { suspended: true, processDefinitionKeyIn: latestKeys },
       }).catch(() => ({ count: 0 })),
 
-      // Idle instances (>5m)
+      // Idle instances (>5m) — scoped to latest definitions
       api('/history/process-instance/count', {
         method: 'POST',
         body: { unfinished: true, active: true, startedBefore: fiveMinAgo, processDefinitionKeyIn: latestKeys },
       }).catch(() => ({ count: 0 })),
 
-      // Message subscriptions
+      // Message subscriptions — no definition filter on this endpoint,
+      // so we fetch them and cross-reference with latest-definition instances
       api('/event-subscription?eventType=message&maxResults=500').catch(() => []),
     ]);
 
@@ -64,7 +65,7 @@ export async function loadHealth() {
     const suspended = suspRes.count   || 0;
     const idle      = idleRes.count   || 0;
 
-    // Filter subscriptions to latest definitions
+    // Messages: filter subscriptions to only those belonging to latest definitions
     let messages = 0;
     if (Array.isArray(msgSubs) && msgSubs.length > 0) {
       const piIds = [...new Set(msgSubs.map(s => s.processInstanceId).filter(Boolean))];
@@ -85,6 +86,7 @@ export async function loadHealth() {
       }
     }
 
+    // ── Build per-card breakdowns ──────────────────────────────────
     // Top definitions by instance count
     const topByInstances = [...stats]
       .filter(s => s.instances > 0)
@@ -215,6 +217,7 @@ export async function loadHealth() {
     }
     oldVerBreakdown.sort((a, b) => b.count - a.count);
 
+    // Store for migration overlay access
     window.__oldVerBreakdown = oldVerBreakdown;
 
     const oldVerEl = document.getElementById('health-old-version');
@@ -264,7 +267,10 @@ export async function loadHealth() {
   }
 }
 
-/* ── Health Card Navigation ────────────────────────────────────── */
+/* ── Health Card Navigation ────────────────────────────────────────
+   Each card/metric is clickable and navigates to the relevant
+   detailed view with appropriate filters pre-applied.
+   ─────────────────────────────────────────────────────────────── */
 
 export function healthNavigate(action) {
   switch (action) {
@@ -289,6 +295,7 @@ export function healthNavigate(action) {
 
     case 'openIncidents':
       switchPanel('incidents');
+      // Default incidents view already loads all — just switch there
       break;
 
     /* ── Waiting & Queued: drill into Query Explorer ────────── */
@@ -329,15 +336,23 @@ export function healthNavigate(action) {
   }
 }
 
+/**
+ * Opens the Query Explorer on the Health panel, fills in the query
+ * fields, and auto-executes. Gives users a ready-made drill-down
+ * they can then tweak further if needed.
+ */
 function drillIntoQueryExplorer(method, path, title, hint) {
+  // Make sure QE section is visible
   const qeBody = document.getElementById('qe-body');
   if (!qeBody.classList.contains('open')) {
     window.toggleQueryExplorer();
   }
 
+  // Scroll QE into view
   const qeContainer = document.getElementById('qe-body');
   qeContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
+  // Fill in the fields
   document.getElementById('qe-method').value = method;
   const badge = document.getElementById('qe-method-badge');
   badge.textContent = method;
@@ -346,13 +361,16 @@ function drillIntoQueryExplorer(method, path, title, hint) {
   document.getElementById('qe-path').value = path;
   document.getElementById('qe-body-input').value = '';
 
+  // Set the query dropdown to "custom" since this is a programmatic query
   const selectEl = document.getElementById('qe-query-select');
   if (selectEl) selectEl.value = 'custom';
 
+  // Show a contextual hint
   const hintEl = document.getElementById('qe-hint');
   hintEl.innerHTML = `<strong>${title}</strong><br>${hint}`;
   hintEl.style.display = 'block';
 
+  // Clear previous results and execute
   document.getElementById('qe-results').style.display = 'none';
   document.getElementById('qe-status').textContent = '';
   window.executeQuery();

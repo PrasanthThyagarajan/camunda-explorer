@@ -1,6 +1,7 @@
 import { AxiosInstance } from "axios";
 import { parseFirstActivity } from "../parsers/bpmn-parser.js";
 import { DEFAULT_BATCH_SIZE, DEFAULT_RETRY_COUNT, MAX_INCIDENTS_FETCH } from "../constants.js";
+import { cleanupIncidentAfterModify, extractErrorMessage } from "../utils/incident-cleanup.js";
 
 export interface BatchResult {
   incidentId: string;
@@ -111,11 +112,11 @@ export class IncidentService {
                 await client.put(`/external-task/${configuration}/retries`, { retries });
                 return { incidentId, status: "success" as const, message: `External task retries set to ${retries}` };
               } catch (fallbackErr: unknown) {
-                return { incidentId, status: "error" as const, message: `Unsupported type (${incidentType}): ${this.extractErrorMessage(fallbackErr)}` };
+                return { incidentId, status: "error" as const, message: `Unsupported type (${incidentType}): ${extractErrorMessage(fallbackErr)}` };
               }
             }
           } catch (error: unknown) {
-            return { incidentId, status: "error" as const, message: this.extractErrorMessage(error) };
+            return { incidentId, status: "error" as const, message: extractErrorMessage(error) };
           }
         })
       );
@@ -207,7 +208,7 @@ export class IncidentService {
         annotation: `Batch modified via Camunda Explorer: moved from ${activityId} → ${moveToId}`,
       });
 
-      await this.cleanupIncidentAfterModify(client, incidentId, incident);
+      await cleanupIncidentAfterModify(client, incidentId, incident);
 
       return {
         incidentId,
@@ -216,35 +217,7 @@ export class IncidentService {
         message: `Moved ${activityId} → ${moveToId}`,
       };
     } catch (error: unknown) {
-      return { incidentId, status: "error", message: this.extractErrorMessage(error) };
-    }
-  }
-
-  private async cleanupIncidentAfterModify(
-    client: AxiosInstance,
-    incidentId: string,
-    incident: Record<string, unknown>
-  ): Promise<void> {
-    try {
-      await client.get(`/incident/${incidentId}`);
-
-      if (incident.incidentType === "failedExternalTask" && incident.configuration) {
-        try {
-          await client.put(`/external-task/${incident.configuration}/retries`, { retries: 1 });
-          return;
-        } catch { /* fall through */ }
-      }
-
-      if (incident.incidentType === "failedJob" && incident.configuration) {
-        try {
-          await client.put(`/job/${incident.configuration}/retries`, { retries: 1 });
-          return;
-        } catch { /* fall through */ }
-      }
-
-      try { await client.delete(`/incident/${incidentId}`); } catch { /* ignored */ }
-    } catch {
-      // incident already gone (auto-resolved by modification)
+      return { incidentId, status: "error", message: extractErrorMessage(error) };
     }
   }
 
@@ -283,7 +256,7 @@ export class IncidentService {
               await client.delete(`/incident/${incidentId}`);
               return { incidentId, status: "success", message: "Incident resolved via DELETE" };
             } catch {
-              return { incidentId, status: "error", message: `Orphaned: ${this.extractErrorMessage(jobErr)}` };
+              return { incidentId, status: "error", message: `Orphaned: ${extractErrorMessage(jobErr)}` };
             }
           }
         }
@@ -296,11 +269,11 @@ export class IncidentService {
         return {
           incidentId,
           status: "error",
-          message: `Unsupported type (${incidentType}): ${this.extractErrorMessage(delErr)}`,
+          message: `Unsupported type (${incidentType}): ${extractErrorMessage(delErr)}`,
         };
       }
     } catch (error: unknown) {
-      return { incidentId, status: "error", message: this.extractErrorMessage(error) };
+      return { incidentId, status: "error", message: extractErrorMessage(error) };
     }
   }
 
@@ -313,8 +286,4 @@ export class IncidentService {
     };
   }
 
-  private extractErrorMessage(error: unknown): string {
-    const err = error as { response?: { data?: { message?: string } }; message?: string };
-    return err.response?.data?.message || err.message || "Unknown error";
-  }
 }

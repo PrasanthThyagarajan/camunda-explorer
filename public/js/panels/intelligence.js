@@ -1,3 +1,13 @@
+/**
+ * Process Intelligence Panel
+ *
+ * BPMN-level intelligence view showing:
+ *   - Node metrics heatmap (failure rate, duration, hotspots)
+ *   - Execution path analysis
+ *   - Failure clusters
+ *   - Quick drill-down to instance-level diagnosis
+ */
+
 import { panelLoaders } from '../state.js';
 import { rawApi, api } from '../api-client.js';
 import { esc, toast, fmtDuration, relativeTime } from '../utils.js';
@@ -32,11 +42,14 @@ const ICONS = {
 
 // ── Helpers ─────────────────────────────────────────────────────
 
+// fmtMs now imported as fmtDuration from shared utils
 const fmtMs = fmtDuration;
 
 function pct(val) {
   return Math.round(val * 100) + '%';
 }
+
+// relativeTime is now imported from ../utils.js
 
 function severityLevel(count) {
   if (count >= 10) return { label: 'Critical', class: 'severity-critical' };
@@ -86,10 +99,12 @@ export async function loadIntelligence() {
   const container = document.getElementById('intel-content');
   if (!container) return;
 
+  // Reset state — navigation always starts fresh at the selector
   currentDefKey = '';
   intelData = null;
   clusterData = null;
 
+  // Refresh definitions list each time
   await loadDefList();
   renderDefSelector(container);
 }
@@ -165,6 +180,7 @@ export function clearIntelDef() {
   currentDefKey = '';
   intelData = null;
   clusterData = null;
+  // Show selector without re-fetching definitions (already cached)
   const container = document.getElementById('intel-content');
   if (container) renderDefSelector(container);
 }
@@ -180,6 +196,7 @@ function renderIntelligence(container) {
 
   const successRate = d.overallFailureRate != null ? (1 - d.overallFailureRate) : 1;
 
+  // Live counts (fetched alongside intelligence data)
   const liveActive = d._liveActive || 0;
   const liveIncidents = d._liveIncidents || 0;
   const liveFailedJobs = d._liveFailedJobs || 0;
@@ -369,6 +386,10 @@ function renderPathsTab() {
 }
 
 // ── Clusters Tab ────────────────────────────────────────────────
+//
+// Design: 2-tier progressive disclosure
+//   Tier 1 (always visible):  Error → Root Cause → Metrics strip → Recovery
+//   Tier 2 (accordion):       Call Chain, Analysis, Actions, Instances
 
 function renderClustersTab() {
   if (!clusterData) return '<div class="empty">No cluster data available</div>';
@@ -394,11 +415,13 @@ function renderClustersTab() {
     const errorText = c.rawErrorSample || c.normalizedError || '';
     const isLongError = errorText.length > 120;
 
+    // Layer + nature badges for header
     const layerBadge = a ? `<span class="cl-pill cl-pill-layer" style="color:${LAYER_COLORS[a.failureLayer] || 'var(--text3)'};border-color:${LAYER_COLORS[a.failureLayer] || 'var(--text3)'}">${LAYER_LABELS[a.failureLayer] || 'Unknown'}</span>` : '';
     const natureBadge = a
       ? (a.isTransient ? `<span class="cl-pill cl-pill-transient">Transient</span>` : `<span class="cl-pill cl-pill-persistent">Persistent</span>`)
       : '';
 
+    // Collect accordion sections dynamically (only render non-empty ones)
     const accSections = [];
 
     if (a?.summary) {
@@ -549,7 +572,7 @@ function renderClustersTab() {
   `;
 }
 
-// ── Accordion Toggle ─────────────────────────────────────────────
+// ── Accordion toggle (class-based, no IDs needed for body) ──────
 
 export function toggleClAccordion(sectionId) {
   const acc = document.getElementById('cl-acc-' + sectionId);
@@ -565,7 +588,8 @@ export function toggleClErrorExpand(idx) {
   if (btn) btn.textContent = isExpanded ? 'Show less' : 'Show more';
 }
 
-export function toggleClusterDetail(idx) { /* no-op */ }
+// Keep legacy name for anything that still calls it
+export function toggleClusterDetail(idx) { /* no-op, replaced by accordions */ }
 
 // ── Stacktrace Viewer Modal ──────────────────────────────────────
 
@@ -638,7 +662,7 @@ const LAYER_COLORS = {
   unknown: 'var(--text3)',
 };
 
-// 12px icons for cluster cards
+// Compact 12px icons used inside cluster card sections
 const ICONS_SM = {
   crosshair: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>`,
   info: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
@@ -680,7 +704,7 @@ export async function loadClusterStacktrace(clusterIdx) {
   `;
 
   try {
-    // Fetch stacktraces for affected instances
+    // Fetch stacktraces for all affected instances (backend resolves them)
     const results = await Promise.all(
       instanceIds.slice(0, 5).map(id =>
         rawApi(`/intelligence/stacktrace/${id}`).catch(() => ({ instanceId: id, traces: [] }))

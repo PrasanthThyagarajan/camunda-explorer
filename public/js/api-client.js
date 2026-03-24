@@ -1,9 +1,11 @@
 const API_PREFIX = '/api';
 
+/** Fetch from Camunda REST API via the proxy (/api/...). */
 export async function api(path, opts = {}) {
   return _fetch(API_PREFIX + path, opts);
 }
 
+/** Fetch from the dashboard server directly (no /api prefix). */
 export async function rawApi(path, opts = {}) {
   return _fetch(path, opts);
 }

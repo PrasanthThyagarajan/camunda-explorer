@@ -35,6 +35,11 @@ export const state = {
   qeResultData: null,
 };
 
+/**
+ * Registry for panel loader functions.
+ * Each panel module registers its loader here during import.
+ * Avoids circular dependencies between navigation and panels.
+ */
 export const panelLoaders = {};
 
 export const sidebarRefreshers = {

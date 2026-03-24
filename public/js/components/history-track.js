@@ -1,3 +1,7 @@
+/**
+ * History Track Popup — shows the complete execution story of any process instance.
+ * Works for both running and completed instances by using the history API.
+ */
 import { rawApi } from '../api-client.js';
 import { esc, copyBtn, toast, fmtDuration, relativeTime } from '../utils.js';
 
@@ -32,7 +36,7 @@ const STATUS_ICONS = {
   canceled: '<svg class="track-icon track-icon-canceled" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>',
 };
 
-// Timeline event icons
+// Timeline event icons (inline SVGs instead of emojis for theme consistency)
 const TL_ICONS = {
   play: '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
   check: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
@@ -42,6 +46,8 @@ const TL_ICONS = {
   user: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
   file: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
 };
+
+// fmtDuration now imported from shared utils
 
 function fmtTime(dateStr) {
   if (!dateStr) return '—';
@@ -54,6 +60,9 @@ function fmtDateTime(dateStr) {
   return new Date(dateStr).toLocaleString();
 }
 
+// relativeTime now imported from shared utils
+
+/** Truncate variable values for display */
 function fmtVarValue(val) {
   if (val === null || val === undefined) return '<span class="text-muted">null</span>';
   const str = typeof val === 'object' ? JSON.stringify(val) : String(val);

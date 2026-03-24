@@ -44,6 +44,7 @@ export async function refreshJobsPopup() {
       return;
     }
 
+    // Build a compact card list instead of a full table
     let html = `<div class="jobs-count">${data.length} job${data.length !== 1 ? 's' : ''}</div>`;
     html += '<div class="jobs-list">';
 

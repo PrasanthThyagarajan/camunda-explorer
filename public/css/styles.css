@@ -112,7 +112,7 @@
   --shadow-md: 0 2px 6px rgba(0,0,0,.05), 0 6px 16px rgba(30,60,110,.06);
   --shadow-lg: 0 4px 10px rgba(0,0,0,.05), 0 12px 32px rgba(30,60,110,.08);
 
-  /* Nav group label */
+  /* Nav group label — slate blue for a clean professional look */
   --nav-group-label: #486a9c;
 
   /* Color picker */
@@ -1203,6 +1203,7 @@ table input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accen
 .st-pre::-webkit-scrollbar-thumb:hover { background: var(--text3); }
 
 /* ── Diagnosis Panel — Shared Row & Section Styles ── */
+/* Matches the cluster card design language for visual consistency */
 
 /* Row pattern (label + content) */
 .dx-row { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
@@ -1276,7 +1277,7 @@ table input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accen
 .dx-cond-val { font-family:var(--mono); color:var(--text2); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .dx-cond-freq { margin-left:auto; font-size:11px; color:var(--text3); font-weight:600; }
 
-/* Stacktrace section content */
+/* Stacktrace section content container (padding inherited from accordion body rule) */
 .dx-st-content { display:flex; flex-direction:column; }
 
 /* Confidence Bar (reusable) */
@@ -1815,7 +1816,7 @@ table input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accen
 .theme-toggle-btn:active { transform: scale(.92); }
 .theme-toggle-btn svg { display: block; }
 
-/* Theme transition — toggled by JS during theme switch */
+/* Smooth theme switch animation — applied temporarily via JS */
 html.theme-transition,
 html.theme-transition *,
 html.theme-transition *::before,
@@ -1831,7 +1832,7 @@ html.theme-transition *::after {
 
 /* ═══════════════════════════════════════════════════════════════════
    Light Theme — Component Overrides
-   Light theme overrides.
+   Polished overrides for an industry-standard light mode experience.
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Sidebar — distinct panel feel ──────────────────────────────── */
@@ -2112,7 +2113,7 @@ html.theme-transition *::after {
 
 /* ═══════════════════════════════════════════════════════════════════
    Light Theme — Page-Level & Dialog Overrides
-   Additional light mode fixes for dialogs and pages.
+   Ensures every page and dialog is fully interactive in bright mode.
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Intelligence Panel ────────────────────────────────────────── */

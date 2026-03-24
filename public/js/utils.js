@@ -58,8 +58,15 @@ export function copyBtn(value) {
   return `<button class="copy-btn" onclick="event.stopPropagation();copyVal(this,'${escaped}')" title="Copy">${COPY_ICON}</button>`;
 }
 
-// ── Duration / Time Formatters ───────────────────────────────────
+/**
+ * Build an HTML table from column definitions and row data.
+ * @param {Array<{key?: string, label: string, render?: Function, copyVal?: Function, noCopy?: boolean}>} cols
+ * @param {Array<object>} rows
+ * @param {Function} [actions] — optional action buttons renderer per row
+ */
+// ── Shared Duration / Time Formatters ───────────────────────────
 
+/** Format milliseconds into a human-readable duration string. */
 export function fmtDuration(ms) {
   if (ms === null || ms === undefined) return '—';
   if (ms === 0) return '0ms';
@@ -72,6 +79,7 @@ export function fmtDuration(ms) {
   return hrs + 'h ' + (mins % 60) + 'm';
 }
 
+/** Relative time (e.g. "3h ago", "2d ago") */
 export function relativeTime(dateStr) {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr).getTime();

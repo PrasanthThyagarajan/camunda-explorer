@@ -14,7 +14,7 @@ async function buildProcDefFilter() {
   try {
     const stats = await api('/process-definition/statistics?failedJobs=true&incidents=true');
 
-    // Latest version per key with running instances
+    // Latest version per key, only those with running instances
     const byKey = new Map();
     for (const s of stats) {
       const key = s.definition?.key || s.id?.split(':')[0];
@@ -39,6 +39,7 @@ async function buildProcDefFilter() {
       sel.innerHTML += `<option value="${d.key}">${d.name} (${d.count})</option>`;
     });
 
+    // Restore previous selection if still valid
     if (currentValue && [...sel.options].some(o => o.value === currentValue)) {
       sel.value = currentValue;
     }
@@ -50,6 +51,7 @@ async function buildProcDefFilter() {
 /* ── Init filters & event wiring ─────────────────────────────── */
 
 export function initInstanceFilters() {
+  // Enter in IDs field triggers search
   const idsInput = document.getElementById('pi-filter-ids');
   if (idsInput) {
     idsInput.addEventListener('keydown', (e) => {
@@ -57,6 +59,7 @@ export function initInstanceFilters() {
     });
   }
 
+  // Enter in business key field triggers search
   const bkInput = document.getElementById('pi-filter-bk');
   if (bkInput) {
     bkInput.addEventListener('keydown', (e) => {
@@ -76,6 +79,7 @@ export async function loadInstances() {
     const bk     = (document.getElementById('pi-filter-bk')?.value || '').trim();
     const st     = (document.getElementById('pi-filter-state')?.value || '');
 
+    // Parse comma-separated instance IDs
     const ids = idsRaw
       ? idsRaw.split(',').map(s => s.trim()).filter(Boolean)
       : [];
@@ -83,6 +87,7 @@ export async function loadInstances() {
     let data;
 
     if (ids.length > 0) {
+      // Use POST body query for multiple instance IDs
       const body = { processInstanceIds: ids };
       if (defKey) body.processDefinitionKey = defKey;
       if (bk) body.businessKeyLike = '%' + bk + '%';
@@ -91,6 +96,7 @@ export async function loadInstances() {
       if (st === 'withIncident') body.withIncident = true;
       data = await api('/process-instance', { method: 'POST', body });
     } else {
+      // Standard GET query
       const params = new URLSearchParams();
       if (defKey) params.set('processDefinitionKey', defKey);
       if (bk) params.set('businessKeyLike', '%' + bk + '%');
@@ -101,6 +107,7 @@ export async function loadInstances() {
       data = await api('/process-instance?' + params);
     }
 
+    // Fetch jobs in parallel to know which instances have them
     let instancesWithJobs = new Set();
     try {
       const jobs = await api('/job?maxResults=500');
@@ -127,13 +134,14 @@ export async function loadInstances() {
 
 /* ── Parsed activity tree rendering ───────────────────────────── */
 
+// Status rendering uses CSS classes (tree-status-incident / tree-status-running)
 
 function flattenActivityTree(node, depth = 0) {
   const items = [];
   const children = node.childActivityInstances || [];
   const transitions = node.childTransitionInstances || [];
 
-  // skip root, go to children
+  // skip root processDefinition — go straight to children
   if (node.activityType !== 'processDefinition') {
     items.push({
       id: node.id,
@@ -202,6 +210,7 @@ export async function showInstanceDetail(id) {
     ]);
     const hasJobs = jobs && jobs.length > 0;
 
+    // also fetch incidents for this instance
     let incidents = [];
     try { incidents = await api(`/incident?processInstanceId=${id}`); } catch { /* ok */ }
 
@@ -213,12 +222,14 @@ export async function showInstanceDetail(id) {
       <span class="k">Incidents</span><span class="v">${incidents.length > 0 ? '<span class="tag tag-red">' + incidents.length + '</span>' : '<span class="tag tag-green">0</span>'}</span>
     </div></div>`;
 
+    // parsed activity tree instead of raw JSON
     if (activities) {
       html += `<div class="detail-section"><h4>Execution State</h4>`;
       html += renderParsedActivityTree(activities, incidents);
       html += `</div>`;
     }
 
+    // variables as a compact table
     if (vars && Object.keys(vars).length > 0) {
       html += `<div class="detail-section"><h4>Variables (${Object.keys(vars).length})</h4>`;
       html += '<div class="var-table"><table><thead><tr><th>Name</th><th>Type</th><th>Value</th></tr></thead><tbody>';
@@ -236,6 +247,7 @@ export async function showInstanceDetail(id) {
       html += `<div class="detail-section"><h4>Variables</h4><div class="empty">No variables.</div></div>`;
     }
 
+    // process control — modify button opens the full dialog
     html += `<div class="detail-section"><h4>Process Control</h4>
       <div class="btn-group" style="margin-top:8px">
         <button class="btn btn-primary" onclick="modifyInstanceFromPanel('${inst.id}')">⇄ Modify Instance</button>
@@ -246,6 +258,7 @@ export async function showInstanceDetail(id) {
       </div>
     </div>`;
 
+    // keep raw JSON behind a collapsible for power users
     if (activities) {
       html += `<div class="detail-section"><details>
         <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--text3)">▶ Raw Activity Instance Tree (JSON)</summary>
@@ -257,7 +270,7 @@ export async function showInstanceDetail(id) {
   } catch (e) { toast('Failed: ' + e.message, 'error'); }
 }
 
-/* ── Manual Modify (fallback) ─────────────────────────────────── */
+/* ── Legacy manual modify (kept as fallback — advanced users) ─── */
 
 export async function modifyInstance(id) {
   const cancelActivity = document.getElementById('mod-cancel')?.value?.trim();

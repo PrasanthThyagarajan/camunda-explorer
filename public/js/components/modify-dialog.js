@@ -29,7 +29,8 @@ export function openModifyDialog() {
 
 export function closeModifyDialog() {
   document.getElementById('modify-dialog-overlay').classList.remove('visible');
-  // deep-reset to avoid shared references
+  // deep-reset: spread creates a shallow copy, but arrays inside would share
+  // references with DEFAULT_DIALOG_STATE — causing mutation bugs on next open
   state.modifyDialog = {
     ...DEFAULT_DIALOG_STATE,
     incidentIds: [],
@@ -206,6 +207,7 @@ function renderSourceTokens(activeTokens) {
     </div>`;
   }
 
+  // multiple tokens — checkboxes
   let html = `<div class="source-section">
     <div class="source-section-header">
       <label>Cancel execution at:</label>
@@ -271,7 +273,9 @@ function renderOptionsSection() {
   </div>`;
 }
 
-/* ── Incident Mode ─────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════
+   INCIDENT MODE — existing functionality (unchanged behavior)
+   ══════════════════════════════════════════════════════════════════ */
 
 export async function modifyIncidentToStart(incidentId) {
   state.modifyDialog = {
@@ -349,7 +353,9 @@ export async function batchModifyToStart() {
   }
 }
 
-/* ── Instance Mode ─────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════
+   INSTANCE MODE — new process-level modify
+   ══════════════════════════════════════════════════════════════════ */
 
 export async function modifyInstanceFromPanel(instanceId) {
   state.modifyDialog = {
@@ -372,11 +378,13 @@ export async function modifyInstanceFromPanel(instanceId) {
     state.modifyDialog.activeTokens = ctx.activeTokens;
     state.modifyDialog.activities = ctx.activities;
 
+    // find stuck activity (first token with incident, or first active token)
     const stuckToken = ctx.activeTokens.find(t => t.hasIncident) || ctx.activeTokens[0];
     state.modifyDialog.stuckActivityId = stuckToken?.activityId || null;
 
     document.getElementById('modify-dialog-subtitle').textContent = 'Select source token(s) to cancel and target activity to move to';
 
+    // build info grid
     const incidentBadge = ctx.incidents.length > 0
       ? `<span class="tag tag-red">${ctx.incidents.length}</span>`
       : '<span class="tag tag-green">0</span>';
@@ -390,16 +398,21 @@ export async function modifyInstanceFromPanel(instanceId) {
       <span class="k">Variables</span><span class="v">${ctx.variableCount}</span>
     `;
 
+    // render the dialog body: source selector + enriched activity list + options
     let bodyHtml = '';
 
+    // sub-process warning
     if (ctx.hasSubProcesses) {
       bodyHtml += `<div class="modify-warning">⚠ This instance has sub-process scopes. Modifying across sub-process boundaries may affect variable scope.</div>`;
     }
 
+    // source token selector
     bodyHtml += renderSourceTokens(ctx.activeTokens);
 
+    // enriched target activity list (with status markers)
     bodyHtml += renderActivityList(ctx.activities, stuckToken?.activityId);
 
+    // advanced options
     bodyHtml += renderOptionsSection();
 
     document.getElementById('modify-dialog-body').innerHTML = bodyHtml;
@@ -409,12 +422,14 @@ export async function modifyInstanceFromPanel(instanceId) {
   }
 }
 
-/* ── Confirm ──────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════
+   CONFIRM — handles all modes
+   ══════════════════════════════════════════════════════════════════ */
 
 export async function confirmModify() {
   const { mode, incidentIds, selectedTargetId } = state.modifyDialog;
 
-  // ── Incident modes ──
+  // ── Incident modes (existing behavior) ──
   if (mode === 'single' || mode === 'batch') {
     if (!selectedTargetId || incidentIds.length === 0) return;
     closeModifyDialog();
@@ -521,6 +536,7 @@ export async function confirmModify() {
           annotation: state.modifyDialog.annotation || undefined,
         },
       });
+      // adapt to the progress component's expected shape
       finishProgress({
         succeeded: result.succeeded,
         failed: result.failed,

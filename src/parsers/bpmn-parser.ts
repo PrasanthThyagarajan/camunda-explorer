@@ -108,32 +108,110 @@ export function parseAllActivities(bpmnXml: string): IBpmnActivity[] {
   let order = 0;
 
   if (startId) {
-    const queue: string[] = [startId];
-    visited.add(startId);
+    // ── Step 1: detect back-edges (loops) via DFS so they don't block
+    //    the topological sort. BPMN processes can have retry/approval loops.
+    const backEdges = new Set<string>();
+    const onStack = new Set<string>();
+    const dfsVisited = new Set<string>();
 
-    while (queue.length > 0) {
-      const nodeId = queue.shift()!;
+    function detectBackEdges(nodeId: string): void {
+      dfsVisited.add(nodeId);
+      onStack.add(nodeId);
+      for (const tgt of adjacency[nodeId] || []) {
+        if (onStack.has(tgt)) {
+          backEdges.add(`${nodeId}→${tgt}`);
+        } else if (!dfsVisited.has(tgt)) {
+          detectBackEdges(tgt);
+        }
+      }
+      onStack.delete(nodeId);
+    }
+    detectBackEdges(startId);
 
-      if (elementMap[nodeId]) {
+    // ── Step 2: compute in-degree for each node, excluding back-edges
+    const inDegree: Record<string, number> = {};
+    for (const nodeId of allNodeIds) {
+      inDegree[nodeId] = 0;
+    }
+    for (const [src, targets] of Object.entries(adjacency)) {
+      for (const tgt of targets) {
+        if (!backEdges.has(`${src}→${tgt}`)) {
+          inDegree[tgt] = (inDegree[tgt] || 0) + 1;
+        }
+      }
+    }
+
+    // ── Step 3: Kahn's topological sort with path-following priority.
+    //    Instead of a plain FIFO queue, we prefer to continue along the
+    //    current path (successors of the last processed node) before
+    //    switching to a different branch. This produces flow-order output
+    //    that follows each branch to completion before moving to the next.
+    const availableSet = new Set<string>();
+    const availableList: string[] = [];
+
+    function addAvailable(nodeId: string): void {
+      if (!availableSet.has(nodeId) && !visited.has(nodeId)) {
+        availableSet.add(nodeId);
+        availableList.push(nodeId);
+      }
+    }
+
+    if ((inDegree[startId] || 0) === 0) {
+      addAvailable(startId);
+    }
+
+    let lastSuccessors: string[] = [];
+
+    while (availableSet.size > 0) {
+      // pick next: prefer a successor of the last-processed node
+      let nextNode: string | null = null;
+      for (const s of lastSuccessors) {
+        if (availableSet.has(s)) {
+          nextNode = s;
+          break;
+        }
+      }
+      // fallback: first available node (preserves discovery order)
+      if (!nextNode) {
+        for (const n of availableList) {
+          if (availableSet.has(n)) {
+            nextNode = n;
+            break;
+          }
+        }
+      }
+      if (!nextNode) break;
+
+      availableSet.delete(nextNode);
+      visited.add(nextNode);
+
+      if (elementMap[nextNode]) {
         orderedActivities.push({
-          id: nodeId,
-          name: elementMap[nodeId].name,
-          type: elementMap[nodeId].type,
-          isFirst: nodeId === firstId,
+          id: nextNode,
+          name: elementMap[nextNode].name,
+          type: elementMap[nextNode].type,
+          isFirst: nextNode === firstId,
           order: order++,
         });
       }
 
-      const targets = adjacency[nodeId] || [];
-      for (const tgt of targets) {
-        if (!visited.has(tgt)) {
-          visited.add(tgt);
-          queue.push(tgt);
+      // remember this node's successors as the preferred next picks
+      lastSuccessors = (adjacency[nextNode] || []).filter(
+        (tgt) => !backEdges.has(`${nextNode}→${tgt}`)
+      );
+
+      // decrement in-degree of successors; when a node reaches 0 it's ready
+      for (const tgt of lastSuccessors) {
+        inDegree[tgt]--;
+        if (inDegree[tgt] === 0) {
+          addAvailable(tgt);
         }
       }
     }
   }
 
+  // append any activities not reachable from the start event (isolated nodes,
+  // or activities inside event sub-processes that have their own entry point)
   for (const [id, info] of Object.entries(elementMap)) {
     if (!visited.has(id)) {
       orderedActivities.push({

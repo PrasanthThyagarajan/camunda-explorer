@@ -1,3 +1,8 @@
+/**
+ * App Entry Point — imports all modules and binds them to window scope
+ * for inline onclick handlers in HTML.
+ */
+
 import { switchPanel, refreshCurrentPanel } from './navigation.js';
 import { openDetail, closeDetail } from './detail-panel.js';
 import { showProgress, updateProgress, finishProgress, closeProgress } from './progress.js';

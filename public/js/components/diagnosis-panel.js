@@ -1,3 +1,15 @@
+/**
+ * Diagnosis Panel — Guided Incident Resolution
+ *
+ * Replaces the guesswork of incident handling with data-driven guidance.
+ * When triggered from an incident or process instance, this overlay shows:
+ *
+ *   1. What failed (activity, error)
+ *   2. Why it failed (signals, patterns, correlations)
+ *   3. What to do next (ranked recovery options with confidence scores)
+ *   4. Safety checks (validation warnings before execution)
+ */
+
 import { rawApi } from '../api-client.js';
 import { esc, toast, fmtDuration } from '../utils.js';
 
@@ -31,6 +43,12 @@ let currentDiagnosis = null;
 
 // ── Public: Open Diagnosis ──────────────────────────────────────
 
+/**
+ * Open the diagnosis panel for a process instance.
+ * Can be triggered from:
+ *   - Incident panel (with incidentId + errorMessage)
+ *   - Process Instance panel (with instanceId only)
+ */
 export async function openDiagnosis(instanceId, incidentId, errorMessage) {
   const overlay = document.getElementById('diagnosis-overlay');
   if (!overlay) return;
@@ -70,6 +88,10 @@ export function closeDiagnosis() {
 }
 
 // ── Render Full Diagnosis ───────────────────────────────────────
+//
+// Two-tier layout matching the cluster card design:
+//   Tier 1: Summary (failure + risk) — always visible
+//   Tier 2: Accordion sections — click to expand
 
 function renderDiagnosis(dx) {
   const body = document.getElementById('dx-body');
@@ -190,6 +212,7 @@ function renderStacktraceAccordion(analysis) {
   const hints = analysis.fixHints || [];
   const frames = analysis.frames || [];
 
+  // Sub-accordion sections (progressive disclosure within the analysis)
   const subSections = [];
 
   if (hints.length > 0) {
@@ -402,6 +425,7 @@ function renderSuggestionsWithHero(dx) {
   const suggestions = dx.suggestions;
   if (suggestions.length === 0) return '';
 
+  // First suggestion is the hero (highest confidence)
   const heroHtml = `
     <div class="dx-hero-suggestion">
       <div class="dx-hero-label">${DX_ICONS.brain} Best Recommendation</div>
@@ -411,6 +435,7 @@ function renderSuggestionsWithHero(dx) {
 
   if (suggestions.length === 1) return heroHtml;
 
+  // Remaining suggestions are collapsed behind a toggle
   const othersHtml = suggestions.slice(1).map((s, i) => renderSuggestion(s, i + 1, dx)).join('');
   return `
     ${heroHtml}
@@ -436,6 +461,7 @@ function renderSuggestion(s, idx, dx) {
     ? '<span class="dx-risk-tag dx-risk-medium">Medium Risk</span>'
     : '<span class="dx-risk-tag dx-risk-low">Low Risk</span>';
 
+  // Get validation for this suggestion
   const valKey = `${s.type}::${s.targetActivityId}`;
   const validation = dx.validation[valKey];
   const isBlocked = validation && !validation.isValid;
@@ -487,16 +513,20 @@ function renderSuggestion(s, idx, dx) {
 
 // ── Confirmation + Execute Recovery ─────────────────────────────
 
-const COOLDOWN_MS = 30000;
+const COOLDOWN_MS = 30000; // 30-second cooldown after an execution
 let lastExecKey = '';
 let lastExecTs = 0;
 
+/**
+ * Show a confirmation dialog before executing a recovery action.
+ * This prevents accidental one-click executions on production instances.
+ */
 export function executeDxRecovery(idx) {
   if (!currentDiagnosis) return;
   const suggestion = currentDiagnosis.suggestions[idx];
   if (!suggestion) return;
 
-  // Cooldown guard
+  // Cooldown guard — prevent re-execution within 30 seconds
   const execKey = `${currentDiagnosis.instanceId}::${suggestion.type}::${suggestion.targetActivityId}`;
   if (execKey === lastExecKey && Date.now() - lastExecTs < COOLDOWN_MS) {
     const remaining = Math.ceil((COOLDOWN_MS - (Date.now() - lastExecTs)) / 1000);
@@ -504,6 +534,7 @@ export function executeDxRecovery(idx) {
     return;
   }
 
+  // Build confirmation summary
   const valKey = `${suggestion.type}::${suggestion.targetActivityId}`;
   const validation = currentDiagnosis.validation[valKey];
   const warnings = validation ? validation.findings.filter(f => f.severity === 'warning') : [];
@@ -537,6 +568,7 @@ export function executeDxRecovery(idx) {
     </div>
   `;
 
+  // Inject the confirmation dialog
   const body = document.getElementById('dx-body');
   if (body) {
     const div = document.createElement('div');
@@ -545,12 +577,15 @@ export function executeDxRecovery(idx) {
   }
 }
 
+/** Cancel the confirmation dialog */
 export function cancelDxConfirm() {
   const overlay = document.getElementById('dx-confirm-overlay');
   if (overlay) overlay.remove();
 }
 
+/** Actually execute after user confirmed */
 export async function confirmDxExecute(idx) {
+  // Remove confirmation dialog
   cancelDxConfirm();
 
   if (!currentDiagnosis) return;
@@ -563,6 +598,7 @@ export async function confirmDxExecute(idx) {
     btn.innerHTML = '<span class="dx-spinner-sm"></span> Executing…';
   }
 
+  // Set cooldown
   const execKey = `${currentDiagnosis.instanceId}::${suggestion.type}::${suggestion.targetActivityId}`;
   lastExecKey = execKey;
   lastExecTs = Date.now();
@@ -583,6 +619,7 @@ export async function confirmDxExecute(idx) {
     if (result.success) {
       toast(`Recovery successful: ${result.message}`, 'success');
       if (btn) btn.innerHTML = `${DX_ICONS.check} Done`;
+      // Refresh relevant panels after a short delay
       setTimeout(() => {
         if (window.loadIncidents) window.loadIncidents();
         if (window.loadInstances) window.loadInstances();
@@ -645,4 +682,5 @@ function formatType(type) {
   }
 }
 
+// fmtMs is now imported as fmtDuration from utils.js
 const fmtMs = fmtDuration;
