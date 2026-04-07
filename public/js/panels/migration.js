@@ -47,7 +47,19 @@ export function closeMigrationOverlay() {
 async function refreshOverlay() {
   try {
     const summary = await rawApi('/migration/old-version/summary');
-    window.__oldVerBreakdown = summary.breakdown || [];
+    // Normalize backend field names so renderOverlayContent() works
+    // regardless of data source.
+    window.__oldVerBreakdown = (summary.breakdown || []).map(b => ({
+      key:         b.key         ?? b.definitionKey,
+      name:        b.name        ?? b.definitionName,
+      defId:       b.defId       ?? b.definitionId,
+      ver:         b.ver         ?? b.currentVersion,
+      latestVer:   b.latestVer   ?? b.latestVersion,
+      latestDefId: b.latestDefId ?? b.latestDefinitionId,
+      count:       b.count       ?? b.instanceCount,
+      failed:      b.failed      ?? b.failedJobs ?? 0,
+      incidents:   b.incidents   ?? 0,
+    }));
   } catch {
     // If fetch fails, keep existing data
   }

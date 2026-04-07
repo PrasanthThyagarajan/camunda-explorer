@@ -35,7 +35,11 @@ export const BPMN_GATEWAY_TYPES = [
   "complexGateway",
 ] as const;
 
-export const BPMN_EVENT_TYPES = ["startEvent", "endEvent"] as const;
+export const BPMN_EVENT_TYPES = [
+  "startEvent",
+  "endEvent",
+  "boundaryEvent",
+] as const;
 
 export const DMN_TYPE_MAP: Record<string, { camundaType: string; sampleValue: unknown }> = {
   string:  { camundaType: "String",  sampleValue: "" },

@@ -402,14 +402,14 @@ export function createMigrationRoutes(
           response?: { status: number; data: unknown };
           message: string;
         };
+        // Validation endpoint may fail on some Camunda versions (e.g. returning
+        // 400 "Source process definition id is null" even though the plan is
+        // correct).  Log the warning but proceed to execute — execute itself
+        // will reject genuinely invalid plans.
         logger.warn(
-          `[MIGRATION] Validation error: ${err.response?.status} ${JSON.stringify(err.response?.data)}`
+          `[MIGRATION] Validation returned error (proceeding to execute anyway): ` +
+            `${err.response?.status} ${JSON.stringify(err.response?.data)}`
         );
-        return res.status(422).json({
-          success: false,
-          error: "Migration validation failed",
-          details: err.response?.data || err.message,
-        });
       }
 
       // Step 3: Execute migration
@@ -446,6 +446,104 @@ export function createMigrationRoutes(
           response?: { status: number; data: unknown };
           message: string;
         };
+        const errData = err.response?.data as {
+          type?: string;
+          message?: string;
+          validationReport?: {
+            processInstanceId?: string;
+            activityInstanceValidationReports?: Array<{
+              sourceScopeId?: string;
+              failures?: string[];
+            }>;
+          };
+        } | undefined;
+
+        // If the batch failed because some instances have tokens at
+        // activities that don't exist in the target BPMN, fall back to
+        // migrating each instance individually so the ones that CAN
+        // migrate will succeed.
+        if (
+          errData?.type === "MigratingProcessInstanceValidationException"
+        ) {
+          if (processInstanceIds.length === 1) {
+            const actReport = errData.validationReport?.activityInstanceValidationReports?.[0];
+            const activityId = actReport?.sourceScopeId || "unknown";
+            const reason = actReport?.failures?.[0] || errData.message || "Unknown validation error";
+            logger.warn(
+              `[MIGRATION] Instance ${processInstanceIds[0]} cannot be migrated: activity ${activityId} — ${reason}`
+            );
+            res.status(422).json({
+              success: false,
+              error: "Instance cannot be migrated",
+              message: `Instance has a token at activity "${activityId}" which does not exist in the target BPMN version. Move the token first (Process Instance Modification), then retry migration.`,
+              skippedInstances: [{ id: processInstanceIds[0], success: false, error: reason }],
+              migratedCount: 0,
+              skippedCount: 1,
+            });
+            return;
+          }
+
+          logger.warn(
+            `[MIGRATION] Batch failed with validation error — retrying ${processInstanceIds.length} instances individually`
+          );
+
+          const results: Array<{
+            id: string;
+            success: boolean;
+            error?: string;
+          }> = [];
+          let okCount = 0;
+          let failCount = 0;
+
+          for (const piId of processInstanceIds) {
+            try {
+              await client.post("/migration/execute", {
+                migrationPlan,
+                processInstanceIds: [piId],
+                skipCustomListeners: skipCustomListeners || false,
+                skipIoMappings: skipIoMappings || false,
+              });
+              results.push({ id: piId, success: true });
+              okCount++;
+            } catch (innerErr: unknown) {
+              const iErr = innerErr as {
+                response?: { data: { message?: string } };
+                message: string;
+              };
+              const msg =
+                iErr.response?.data?.message || iErr.message;
+              results.push({ id: piId, success: false, error: msg });
+              failCount++;
+            }
+          }
+
+          logger.info(
+            JSON.stringify({
+              event: "MIGRATION_PARTIAL",
+              sourceDefinitionId,
+              targetDefinitionId,
+              migrated: okCount,
+              skipped: failCount,
+              timestamp: new Date().toISOString(),
+            })
+          );
+
+          const statusCode = okCount > 0 ? 200 : 500;
+          res.status(statusCode).json({
+            success: okCount > 0,
+            message:
+              failCount === 0
+                ? `Successfully migrated ${okCount} instance(s)`
+                : `Migrated ${okCount} instance(s), ${failCount} could not be migrated (tokens at activities removed in target BPMN — modify their position first)`,
+            migratedCount: okCount,
+            skippedCount: failCount,
+            sourceDefinitionId,
+            targetDefinitionId,
+            skippedInstances: results.filter((r) => !r.success),
+          });
+          return;
+        }
+
         logger.error(
           `[MIGRATION] Execution failed: ${err.response?.status} ${JSON.stringify(err.response?.data)}`
         );

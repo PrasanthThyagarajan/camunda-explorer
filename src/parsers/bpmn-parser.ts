@@ -58,8 +58,16 @@ export function parseAllActivities(bpmnXml: string): IBpmnActivity[] {
   const firstAct = parseFirstActivity(bpmnXml);
   const firstId = firstAct?.firstActivityId || null;
 
+  // Include all BPMN node types (activities, events, gateways) in the
+  // element map so boundary events and gateways appear as valid targets
+  // for process instance modification.
+  const allElementTypes = [
+    ...BPMN_ACTIVITY_TYPES,
+    ...BPMN_EVENT_TYPES,
+    ...BPMN_GATEWAY_TYPES,
+  ];
   const elementMap: Record<string, { name: string; type: string }> = {};
-  for (const elType of BPMN_ACTIVITY_TYPES) {
+  for (const elType of allElementTypes) {
     const regex = new RegExp(`<(?:bpmn2?:)?${elType}\\s+([^>]*?)\\/?\\s*>`, "g");
     let m;
     while ((m = regex.exec(bpmnXml)) !== null) {
