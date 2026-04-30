@@ -13,11 +13,11 @@ import { loadHealth, healthNavigate } from './panels/health.js';
 import {
   loadIncidents, retryIncident, showIncidentDetail,
   toggleAllIncidents, updateBatchBar, selectAllIncidents, deselectAllIncidents,
-  batchRetry, toggleStacktrace,
+  batchRetry, toggleStacktrace, onIncProcDefChange,
 } from './panels/incidents.js';
 import {
   loadInstances, showInstanceDetail, modifyInstance, toggleSuspend, deleteInstance,
-  initInstanceFilters,
+  initInstanceFilters, onPiProcDefChange,
 } from './panels/instances.js';
 import {
   openJobsPopup, closeJobsPopup, refreshJobsPopup,
@@ -108,6 +108,7 @@ window.copyVal = copyVal;
 
 // Incidents
 window.loadIncidents = loadIncidents;
+window.onIncProcDefChange = onIncProcDefChange;
 window.retryIncident = retryIncident;
 window.showIncidentDetail = showIncidentDetail;
 window.toggleAllIncidents = toggleAllIncidents;
@@ -119,6 +120,7 @@ window.toggleStacktrace = toggleStacktrace;
 
 // Instances
 window.loadInstances = loadInstances;
+window.onPiProcDefChange = onPiProcDefChange;
 window.showInstanceDetail = showInstanceDetail;
 window.modifyInstance = modifyInstance;
 window.toggleSuspend = toggleSuspend;

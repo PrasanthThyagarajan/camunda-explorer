@@ -316,8 +316,14 @@
         </div>
         <div class="form-group">
           <label>Process Definition</label>
-          <select id="inc-filter-procdef" onchange="loadIncidents()">
+          <select id="inc-filter-procdef" onchange="onIncProcDefChange()">
             <option value="">All Processes</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Node</label>
+          <select id="inc-filter-node" onchange="loadIncidents()" disabled>
+            <option value="">Select a process first</option>
           </select>
         </div>
         <div class="form-group">
@@ -357,8 +363,14 @@
         </div>
         <div class="form-group" style="flex:1.5;min-width:220px">
           <label>BPMN Process</label>
-          <select id="pi-filter-procdef" onchange="loadInstances()">
+          <select id="pi-filter-procdef" onchange="onPiProcDefChange()">
             <option value="">All Processes</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1.5;min-width:200px">
+          <label>Node</label>
+          <select id="pi-filter-node" onchange="loadInstances()" disabled>
+            <option value="">Select a process first</option>
           </select>
         </div>
         <div class="form-group" style="flex:1;min-width:160px">

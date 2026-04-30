@@ -355,18 +355,120 @@ function renderHeatmapTab() {
 
 // ── Paths Tab ───────────────────────────────────────────────────
 
+// Activity-type categorisation for path step rendering.
+// Mirrors the BPMN category buckets used elsewhere in the app.
+const PATH_TYPE_INFO = {
+  serviceTask:            { category: 'task',    label: 'Service Task',    icon: '⚙' },
+  userTask:               { category: 'task',    label: 'User Task',       icon: '👤' },
+  sendTask:               { category: 'task',    label: 'Send Task',       icon: '✉' },
+  receiveTask:            { category: 'task',    label: 'Receive Task',    icon: '📥' },
+  scriptTask:             { category: 'task',    label: 'Script Task',     icon: '〈/〉' },
+  businessRuleTask:       { category: 'task',    label: 'Business Rule',   icon: '⚖' },
+  manualTask:             { category: 'task',    label: 'Manual Task',     icon: '✋' },
+  callActivity:           { category: 'task',    label: 'Call Activity',   icon: '↗' },
+  subProcess:             { category: 'task',    label: 'Sub-Process',     icon: '▢' },
+  task:                   { category: 'task',    label: 'Task',            icon: '▭' },
+  exclusiveGateway:       { category: 'gateway', label: 'Gateway',         icon: '✕' },
+  parallelGateway:        { category: 'gateway', label: 'Parallel Gateway',icon: '+' },
+  inclusiveGateway:       { category: 'gateway', label: 'Inclusive Gateway', icon: '◯' },
+  eventBasedGateway:      { category: 'gateway', label: 'Event Gateway',   icon: '◇' },
+  complexGateway:         { category: 'gateway', label: 'Complex Gateway', icon: '✱' },
+  startEvent:             { category: 'event',   label: 'Start Event',     icon: '▷' },
+  endEvent:               { category: 'event',   label: 'End Event',       icon: '◼' },
+  intermediateCatchEvent: { category: 'event',   label: 'Catch Event',     icon: '◎' },
+  intermediateThrowEvent: { category: 'event',   label: 'Throw Event',     icon: '◉' },
+  boundaryEvent:          { category: 'event',   label: 'Boundary Event',  icon: '◈' },
+};
+
+function inferTypeFromId(activityId) {
+  if (!activityId) return 'task';
+  const lower = activityId.toLowerCase();
+  if (lower.startsWith('startevent')) return 'startEvent';
+  if (lower.startsWith('endevent')) return 'endEvent';
+  if (lower.startsWith('gateway')) return 'exclusiveGateway';
+  if (lower.startsWith('event')) return 'intermediateCatchEvent';
+  return 'task';
+}
+
+function getPathStepInfo(activityId, nodeLookup) {
+  const node = nodeLookup.get(activityId);
+  const type = node?.activityType || inferTypeFromId(activityId);
+  const meta = PATH_TYPE_INFO[type] || { category: 'task', label: type || 'Activity', icon: '▭' };
+  return {
+    name: node?.activityName || activityId,
+    type,
+    typeLabel: meta.label,
+    icon: meta.icon,
+    category: meta.category,
+    isHotspot: !!node?.isHotspot,
+    failureRate: node?.failureRate ?? 0,
+    executionCount: node?.executionCount ?? 0,
+  };
+}
+
+function renderPathStep(activityId, idx, nodeLookup) {
+  const info = getPathStepInfo(activityId, nodeLookup);
+  const stepClass = [
+    'intel-path-step',
+    `intel-path-step-${info.category}`,
+    info.isHotspot ? 'intel-path-step-hot' : '',
+  ].filter(Boolean).join(' ');
+
+  const tooltipParts = [
+    `${info.typeLabel}`,
+    `ID: ${activityId}`,
+    info.executionCount ? `Executions: ${info.executionCount}` : null,
+    info.failureRate > 0 ? `Failure rate: ${pct(info.failureRate)}` : null,
+    info.isHotspot ? 'Hotspot — high failure rate' : null,
+  ].filter(Boolean);
+  const tooltip = tooltipParts.join('\n');
+
+  const hotBadge = info.isHotspot
+    ? `<span class="intel-path-step-hot-badge" title="Hotspot">${ICONS.hotspot}</span>`
+    : '';
+
+  return `
+    <span class="${stepClass}" title="${esc(tooltip)}">
+      <span class="intel-path-step-num">${idx + 1}</span>
+      <span class="intel-path-step-icon" aria-hidden="true">${info.icon}</span>
+      <span class="intel-path-step-body">
+        <span class="intel-path-step-name">${esc(info.name)}</span>
+        <span class="intel-path-step-type">${esc(info.typeLabel)}</span>
+      </span>
+      ${hotBadge}
+    </span>
+  `;
+}
+
 function renderPathsTab() {
   if (!intelData) return '';
   const paths = intelData.commonPaths || [];
   if (paths.length === 0) return '<div class="empty">No path data available</div>';
 
+  // Build a lookup of node info from nodeMetrics so we can render
+  // human-readable names + BPMN type info for each step in the path.
+  const nodeLookup = new Map();
+  for (const n of intelData.nodeMetrics || []) {
+    nodeLookup.set(n.activityId, n);
+  }
+
   const rows = paths.map((p, idx) => {
+    const steps = p.pathDescription || [];
+    const uniqueCount = new Set(steps).size;
+    const hotspotCount = steps.reduce((acc, id) => {
+      const node = nodeLookup.get(id);
+      return acc + (node?.isHotspot ? 1 : 0);
+    }, 0);
+
     const riskBadge = p.isHighRisk
       ? '<span class="intel-risk-badge">HIGH RISK</span>'
       : '';
-    const pathSteps = p.pathDescription.map(s =>
-      `<span class="intel-path-step">${esc(s)}</span>`
-    ).join('<span class="intel-path-arrow">→</span>');
+    const hotspotsBadge = hotspotCount > 0
+      ? `<span class="intel-path-hotspots" title="Hotspot nodes on this path">${ICONS.hotspot} ${hotspotCount} hotspot${hotspotCount !== 1 ? 's' : ''}</span>`
+      : '';
+
+    const stepsHtml = steps.map((id, i) => renderPathStep(id, i, nodeLookup))
+      .join('<span class="intel-path-arrow" aria-hidden="true">→</span>');
 
     return `
       <div class="intel-path-card ${p.isHighRisk ? 'intel-path-risky' : ''}">
@@ -375,9 +477,11 @@ function renderPathsTab() {
           <span class="intel-path-freq">${pct(p.frequency)} of instances</span>
           <span class="intel-path-fail" style="color:${riskColor(p.failureRate)}">${pct(p.failureRate)} failure</span>
           <span class="intel-path-dur">${fmtMs(p.avgDurationMs)} avg</span>
+          <span class="intel-path-count">${steps.length} step${steps.length !== 1 ? 's' : ''} · ${uniqueCount} unique node${uniqueCount !== 1 ? 's' : ''}</span>
+          ${hotspotsBadge}
           ${riskBadge}
         </div>
-        <div class="intel-path-flow">${pathSteps}</div>
+        <div class="intel-path-flow">${stepsHtml}</div>
       </div>
     `;
   }).join('');

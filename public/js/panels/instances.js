@@ -2,6 +2,11 @@ import { api } from '../api-client.js';
 import { esc, shortId, fmtDate, copyBtn, buildTable, toast } from '../utils.js';
 import { panelLoaders } from '../state.js';
 import { openDetail, closeDetail } from '../detail-panel.js';
+import { populateNodeFilter, clearNodeFilter } from '../components/node-filter.js';
+
+// Tracks the last process definition key used to populate the Node filter
+// so we can detect when the user switches process and reset the node selection.
+let lastPiProcDefKey = '';
 
 /* ── Populate BPMN Process <select> with active definitions ───── */
 
@@ -48,6 +53,24 @@ async function buildProcDefFilter() {
   }
 }
 
+/* ── Node filter wiring ───────────────────────────────────────── */
+
+/**
+ * Handler for the "BPMN Process" filter change.
+ * Repopulates the Node filter with activities from the selected process,
+ * resets any previously-selected node, then reloads the instances list.
+ */
+export async function onPiProcDefChange() {
+  const procDefKey = document.getElementById('pi-filter-procdef').value;
+  if (procDefKey !== lastPiProcDefKey) {
+    lastPiProcDefKey = procDefKey;
+    const nodeSel = document.getElementById('pi-filter-node');
+    if (nodeSel) nodeSel.value = '';
+    await populateNodeFilter('pi-filter-node', procDefKey);
+  }
+  await loadInstances();
+}
+
 /* ── Init filters & event wiring ─────────────────────────────── */
 
 export function initInstanceFilters() {
@@ -78,6 +101,18 @@ export async function loadInstances() {
     const defKey = (document.getElementById('pi-filter-procdef')?.value || '').trim();
     const bk     = (document.getElementById('pi-filter-bk')?.value || '').trim();
     const st     = (document.getElementById('pi-filter-state')?.value || '');
+    const nodeId = (document.getElementById('pi-filter-node')?.value || '').trim();
+
+    // Keep the Node filter in sync if procdef was changed via something other
+    // than onPiProcDefChange (e.g. cross-panel navigation).
+    if (defKey !== lastPiProcDefKey) {
+      lastPiProcDefKey = defKey;
+      if (defKey) {
+        await populateNodeFilter('pi-filter-node', defKey, { preserveSelection: true });
+      } else {
+        clearNodeFilter('pi-filter-node');
+      }
+    }
 
     // Parse comma-separated instance IDs
     const ids = idsRaw
@@ -94,6 +129,7 @@ export async function loadInstances() {
       if (st === 'active')       body.active = true;
       if (st === 'suspended')    body.suspended = true;
       if (st === 'withIncident') body.withIncident = true;
+      if (nodeId) body.activityIdIn = [nodeId];
       data = await api('/process-instance', { method: 'POST', body });
     } else {
       // Standard GET query
@@ -103,6 +139,7 @@ export async function loadInstances() {
       if (st === 'active')       params.set('active', 'true');
       if (st === 'suspended')    params.set('suspended', 'true');
       if (st === 'withIncident') params.set('withIncident', 'true');
+      if (nodeId) params.set('activityIdIn', nodeId);
       params.set('maxResults', '100');
       data = await api('/process-instance?' + params);
     }

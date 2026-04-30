@@ -6,6 +6,10 @@ export const state = {
   procDefNameCache: {},
   procDefFilterBuilt: false,
 
+  // Cache of parsed BPMN activities keyed by processDefinitionKey
+  // Used by the "Node" filter on Incidents and Process Instances panels
+  bpmnNodeCache: {},
+
   dmnDecisions: [],
   dmnInputsMeta: [],
   dmnGroupedVars: {},

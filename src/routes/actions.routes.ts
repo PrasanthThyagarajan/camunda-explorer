@@ -55,6 +55,29 @@ export function createActionsRoutes(
   );
 
   router.get(
+    "/bpmn-activities-by-key/:processDefinitionKey",
+    asyncHandler(async (req, res) => {
+      const client = getClient();
+      const xmlRes = await client.get(
+        `/process-definition/key/${req.params.processDefinitionKey}/xml`
+      );
+      const bpmnXml = xmlRes.data.bpmn20Xml;
+      if (!bpmnXml) {
+        return res.status(422).json({ error: "No BPMN XML returned" });
+      }
+      const activities = parseAllActivities(bpmnXml);
+      const first = parseFirstActivity(bpmnXml);
+      res.json({
+        processDefinitionKey: req.params.processDefinitionKey,
+        processDefinitionId: xmlRes.data.id || null,
+        startEventId: first?.startEventId || null,
+        firstActivityId: first?.firstActivityId || null,
+        activities,
+      });
+    })
+  );
+
+  router.get(
     "/start-form/:processDefinitionKey",
     asyncHandler(async (req, res) => {
       const client = getClient();

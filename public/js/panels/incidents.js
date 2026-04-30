@@ -5,6 +5,11 @@ import { refreshCurrentPanel } from '../navigation.js';
 import { openDetail, closeDetail } from '../detail-panel.js';
 import { showProgress, updateProgress, finishProgress } from '../progress.js';
 import { openModifyDialog, modifyIncidentToStart, batchModifyToStart } from '../components/modify-dialog.js';
+import { populateNodeFilter, clearNodeFilter } from '../components/node-filter.js';
+
+// Tracks the last process definition key used to populate the Node filter
+// so we can detect when the user switches process and reset the node selection.
+let lastIncProcDefKey = '';
 
 async function loadProcDefNames() {
   if (Object.keys(state.procDefNameCache).length > 0) return;
@@ -54,6 +59,22 @@ async function buildProcDefFilterFromIncidents(incidents) {
   }
 }
 
+/**
+ * Handler for the "Process Definition" filter change.
+ * Repopulates the Node filter with activities from the selected process,
+ * resets any previously-selected node, then reloads the incidents list.
+ */
+export async function onIncProcDefChange() {
+  const procDefKey = document.getElementById('inc-filter-procdef').value;
+  if (procDefKey !== lastIncProcDefKey) {
+    lastIncProcDefKey = procDefKey;
+    const nodeSel = document.getElementById('inc-filter-node');
+    if (nodeSel) nodeSel.value = '';
+    await populateNodeFilter('inc-filter-node', procDefKey);
+  }
+  await loadIncidents();
+}
+
 export async function loadIncidents() {
   await loadProcDefNames();
 
@@ -62,8 +83,10 @@ export async function loadIncidents() {
     const type = document.getElementById('inc-filter-type').value;
     const pi = document.getElementById('inc-filter-pi').value;
     const procDefKey = document.getElementById('inc-filter-procdef').value;
+    const nodeId = document.getElementById('inc-filter-node')?.value || '';
     if (type) allParams.set('incidentType', type);
     if (pi) allParams.set('processInstanceId', pi);
+    if (nodeId) allParams.set('activityId', nodeId);
     allParams.set('sortBy', 'incidentTimestamp');
     allParams.set('sortOrder', 'desc');
     allParams.set('maxResults', '500');
@@ -71,6 +94,17 @@ export async function loadIncidents() {
     const allIncidents = await api('/incident?' + allParams) || [];
 
     await buildProcDefFilterFromIncidents(allIncidents);
+
+    // Keep the Node filter in sync if procdef was changed via something other
+    // than onIncProcDefChange (e.g. cross-panel navigation from Health).
+    if (procDefKey !== lastIncProcDefKey) {
+      lastIncProcDefKey = procDefKey;
+      if (procDefKey) {
+        await populateNodeFilter('inc-filter-node', procDefKey, { preserveSelection: true });
+      } else {
+        clearNodeFilter('inc-filter-node');
+      }
+    }
 
     let incidents = allIncidents;
     if (procDefKey) {
