@@ -4,12 +4,33 @@ import { asyncHandler } from "../middleware/error-handler.js";
 import { parseFirstActivity, parseAllActivities, parseStartFormFields, parseDmnInputs, groupDmnInputs, buildSamplePayload } from "../parsers/index.js";
 import { IncidentService } from "../services/incident.service.js";
 import { ProcessInstanceService } from "../services/process-instance.service.js";
+import { InstanceSearchService } from "../services/instance-search.service.js";
 import { buildCamundaClient } from "../services/camunda-client.factory.js";
 import type { EnvironmentService } from "../services/environment.service.js";
-import { MODIFICATION_REQUEST_TIMEOUT } from "../constants.js";
+import {
+  DEFAULT_BATCH_SIZE,
+  DEFAULT_INSTANCE_BATCH_SIZE,
+  MAX_DELETE_BATCH_SIZE,
+  MAX_INCIDENT_BATCH_SIZE,
+  MAX_INSTANCE_BATCH_SIZE,
+  MAX_MODIFY_IDS,
+  MODIFICATION_REQUEST_TIMEOUT,
+} from "../constants.js";
 import { logger } from "../utils/logger.js";
 
 const VALID_INSTRUCTION_TYPES = new Set(["startBeforeActivity", "startAfterActivity"]);
+
+/**
+ * Batch sizes drive `i += batchSize` loops, so a zero or negative value would
+ * spin forever and block the event loop for the whole process.
+ */
+export function parseBatchSize(value: unknown, fallback: number, max: number): number | null {
+  if (value === undefined || value === null) return fallback;
+  if (!Number.isInteger(value) || (value as number) < 1 || (value as number) > max) {
+    return null;
+  }
+  return value as number;
+}
 
 export function createActionsRoutes(
   envService: EnvironmentService,
@@ -17,6 +38,7 @@ export function createActionsRoutes(
   processInstanceService: ProcessInstanceService
 ): Router {
   const router = Router();
+  const instanceSearchService = new InstanceSearchService();
 
   function getClient(timeoutOverride?: number): AxiosInstance {
     const env = envService.getActive();
@@ -193,8 +215,12 @@ export function createActionsRoutes(
       if (!incidentIds || !Array.isArray(incidentIds) || incidentIds.length === 0) {
         return res.status(400).json({ error: "incidentIds array is required" });
       }
+      const size = parseBatchSize(batchSize, DEFAULT_BATCH_SIZE, MAX_INCIDENT_BATCH_SIZE);
+      if (size === null) {
+        return res.status(400).json({ error: `batchSize must be an integer between 1 and ${MAX_INCIDENT_BATCH_SIZE}` });
+      }
       const result = await incidentService.batchModifyToStart(
-        client, incidentIds, batchSize, targetActivityId
+        client, incidentIds, size, targetActivityId
       );
       logger.info(`[BATCH] Modify complete: ${result.succeeded}/${result.total} succeeded`);
       res.json(result);
@@ -209,7 +235,14 @@ export function createActionsRoutes(
       if (!incidentIds || !Array.isArray(incidentIds) || incidentIds.length === 0) {
         return res.status(400).json({ error: "incidentIds array is required" });
       }
-      const result = await incidentService.batchResolve(client, incidentIds, batchSize, strategy);
+      // The delete strategy destroys process instances, so it never runs at the
+      // full incident concurrency regardless of what the client asks for.
+      const ceiling = strategy === "delete" ? MAX_DELETE_BATCH_SIZE : MAX_INCIDENT_BATCH_SIZE;
+      const size = parseBatchSize(batchSize, Math.min(DEFAULT_BATCH_SIZE, ceiling), ceiling);
+      if (size === null) {
+        return res.status(400).json({ error: `batchSize must be an integer between 1 and ${ceiling} for the ${strategy === "delete" ? "delete" : "retry"} strategy` });
+      }
+      const result = await incidentService.batchResolve(client, incidentIds, size, strategy);
       res.json(result);
     })
   );
@@ -222,7 +255,11 @@ export function createActionsRoutes(
       if (!incidentIds || !Array.isArray(incidentIds) || incidentIds.length === 0) {
         return res.status(400).json({ error: "incidentIds array is required" });
       }
-      const result = await incidentService.batchRetry(client, incidentIds, batchSize, retries);
+      const size = parseBatchSize(batchSize, DEFAULT_BATCH_SIZE, MAX_INCIDENT_BATCH_SIZE);
+      if (size === null) {
+        return res.status(400).json({ error: `batchSize must be an integer between 1 and ${MAX_INCIDENT_BATCH_SIZE}` });
+      }
+      const result = await incidentService.batchRetry(client, incidentIds, size, retries);
       res.json(result);
     })
   );
@@ -250,6 +287,15 @@ export function createActionsRoutes(
   );
 
   // ── Process Instance Modify routes ──────────────────────────────
+
+  router.post(
+    "/instance-search",
+    asyncHandler(async (req, res) => {
+      const client = getClient(MODIFICATION_REQUEST_TIMEOUT);
+      const result = await instanceSearchService.search(client, req.body || {});
+      res.json(result);
+    })
+  );
 
   router.get(
     "/instance-context/:instanceId",
@@ -314,15 +360,22 @@ export function createActionsRoutes(
       const {
         instanceIds,
         targetActivityId,
-        batchSize,
         instructionType,
         skipCustomListeners,
         skipIoMappings,
         annotation,
+        batchSize,
       } = req.body;
 
       if (!Array.isArray(instanceIds) || instanceIds.length === 0) {
         return res.status(400).json({ error: "instanceIds must be a non-empty array" });
+      }
+      const size = parseBatchSize(batchSize, DEFAULT_INSTANCE_BATCH_SIZE, MAX_INSTANCE_BATCH_SIZE);
+      if (size === null) {
+        return res.status(400).json({ error: `batchSize must be an integer between 1 and ${MAX_INSTANCE_BATCH_SIZE}` });
+      }
+      if (new Set(instanceIds).size > MAX_MODIFY_IDS) {
+        return res.status(400).json({ error: `At most ${MAX_MODIFY_IDS} instances can be modified at once` });
       }
       if (!targetActivityId || typeof targetActivityId !== "string") {
         return res.status(400).json({ error: "targetActivityId (string) is required" });
@@ -331,23 +384,50 @@ export function createActionsRoutes(
         return res.status(400).json({ error: `Invalid instructionType. Must be one of: ${[...VALID_INSTRUCTION_TYPES].join(", ")}` });
       }
 
-      const safeBatchSize = typeof batchSize === "number" && batchSize > 0 ? batchSize : undefined;
-
       const result = await processInstanceService.batchModifyInstances(
         client,
         instanceIds,
         targetActivityId,
-        safeBatchSize,
         {
           instructionType: instructionType || "startBeforeActivity",
           skipCustomListeners: !!skipCustomListeners,
           skipIoMappings: !!skipIoMappings,
           annotation: typeof annotation === "string" ? annotation : undefined,
+          batchSize: size,
         }
       );
 
-      logger.info(`[BATCH-INSTANCE-MODIFY] ${result.succeeded}/${result.total} succeeded`);
+      logger.info(`[BATCH-INSTANCE-MODIFY] ${result.submittedInstances}/${result.totalInstances} submitted in ${result.batches.length} engine batch(es) of up to ${size}`);
       res.json(result);
+    })
+  );
+
+  router.get(
+    "/batch-status/:batchId",
+    asyncHandler(async (req, res) => {
+      const client = getClient();
+      try {
+        const statistics = await client.get("/batch/statistics", {
+          params: { batchId: req.params.batchId },
+        });
+        const batch = (statistics.data || [])[0];
+        if (!batch) {
+          throw Object.assign(new Error("Batch not found"), { response: { status: 404 } });
+        }
+        const failedJobs = batch.failedJobs || 0;
+        // A failed job can still be retried by an operator. Keep polling while
+        // the runtime batch exists; never imply it is safe to submit again.
+        res.json({ status: "running", batch, failedJobs });
+      } catch (error: unknown) {
+        const status = (error as { response?: { status?: number } }).response?.status;
+        if (status !== 404) throw error;
+        const historic = await client.get(`/history/batch/${req.params.batchId}`)
+          .then((response) => response.data)
+          .catch(() => null);
+        // Runtime batches are removed only after all batch jobs finish. History
+        // may be disabled, so a runtime 404 is itself the completion signal.
+        res.json({ status: "completed", historic, failedJobs: 0 });
+      }
     })
   );
 

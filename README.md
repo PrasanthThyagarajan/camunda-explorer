@@ -3,7 +3,7 @@
 Two things in one repo:
 
 - **Dashboard** — a web UI at `localhost:3333` where you can monitor your Camunda 7 engine, manage incidents, test DMN tables, and handle batch operations across multiple environments.
-- **MCP Server** — an AI-friendly interface that lets tools like Cursor and Claude talk to your Camunda engine through natural language. It exposes 60+ operations as MCP tools.
+- **MCP Server** — a programmatic interface for MCP-compatible clients, exposing 60+ Camunda operations as MCP tools.
 
 Both share the same codebase and talk to the same Camunda REST API.
 
@@ -36,7 +36,7 @@ npm run dashboard
 
 Then open http://localhost:3333.
 
-**To run the MCP server** (for AI assistants):
+**To run the MCP server** (for MCP clients):
 
 ```bash
 npm run dev:run
@@ -139,7 +139,7 @@ Three housekeeping tools:
 - **Batch resolve** — filter incidents by type and/or process key, preview the matches, then resolve them all with either a retry or delete strategy.
 - **Stale incident finder** — surfaces incidents older than N days so you can deal with long-forgotten failures.
 
-### AI Agent Tools (MCP)
+### MCP Tools
 
 Runs as a separate process via `npm run dev:run`. Exposes 60+ tools across 10 categories:
 

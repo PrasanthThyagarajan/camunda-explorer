@@ -2,7 +2,7 @@
 
 Quick overview of how this project is put together. Two apps share one codebase:
 
-- **MCP Server** (`npm run dev:run`) — STDIO transport, used by AI agents (Cursor, Claude). Entry point: `src/index.ts`.
+- **MCP Server** (`npm run dev:run`) — STDIO transport, used by MCP-compatible clients. Entry point: `src/index.ts`.
 - **Dashboard** (`npm run dashboard`) — Express server at port 3333. Entry point: `src/dashboard/server.ts`.
 
 ---
@@ -89,8 +89,8 @@ public/
 There are two paths depending on who's asking:
 
 ```
-AI agent  →  STDIO  →  MCP Server  →  tool modules  →  Axios  →  Camunda REST API
-Browser   →  HTTP   →  Express     →  /api/* proxy   →  Axios  →  Camunda REST API
+MCP client →  STDIO  →  MCP Server  →  tool modules  →  Axios  →  Camunda REST API
+Browser    →  HTTP   →  Express     →  /api/* proxy   →  Axios  →  Camunda REST API
                                    →  /environments  →  service → repository → JSON file
 ```
 

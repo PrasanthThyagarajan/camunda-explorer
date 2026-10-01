@@ -330,7 +330,7 @@
           <label>Process Instance ID</label>
           <input type="text" id="inc-filter-pi" placeholder="Filter by instance…" />
         </div>
-        <div class="form-group" style="justify-content:flex-end">
+        <div class="form-group form-group-action">
           <label>&nbsp;</label>
           <button class="btn btn-primary" onclick="loadIncidents()">Search</button>
         </div>
@@ -344,7 +344,7 @@
           <button class="btn btn-primary btn-sm" onclick="batchModifyToStart()">⇄ Modify</button>
         </div>
         <div class="batch-config">
-          <label>Batch size:</label>
+          <label>Retry batch size:</label>
           <input type="number" id="batch-size" value="10" min="1" max="100" />
           <button class="btn btn-outline btn-sm" onclick="selectAllIncidents()">Select All</button>
           <button class="btn btn-outline btn-sm" onclick="deselectAllIncidents()">Deselect</button>
@@ -373,11 +373,11 @@
             <option value="">Select a process first</option>
           </select>
         </div>
-        <div class="form-group" style="flex:1;min-width:160px">
+        <div class="form-group" style="flex:1;min-width:180px">
           <label>Business Key</label>
-          <input type="text" id="pi-filter-bk" placeholder="Business key…" />
+          <input type="text" id="pi-filter-bk" placeholder="One LIKE term or exact keys…" />
         </div>
-        <div class="form-group" style="flex:0.8;min-width:140px">
+        <div class="form-group" style="flex:0.8;min-width:180px">
           <label>State</label>
           <select id="pi-filter-state">
             <option value="">All</option>
@@ -386,10 +386,36 @@
             <option value="withIncident">With Incidents</option>
           </select>
         </div>
-        <div class="form-group" style="justify-content:flex-end">
+        <div class="form-group form-group-action">
           <label>&nbsp;</label>
           <button class="btn btn-primary" onclick="loadInstances()">Search</button>
         </div>
+      </div>
+      <div class="form-row mb-16">
+        <div class="form-group" style="flex:1;min-width:190px">
+          <label>Created From</label>
+          <input type="datetime-local" id="pi-filter-from" />
+        </div>
+        <div class="form-group" style="flex:1;min-width:190px">
+          <label>Created To</label>
+          <input type="datetime-local" id="pi-filter-to" />
+        </div>
+        <div class="form-group" style="flex:1;min-width:180px">
+          <label>Variable Name</label>
+          <input type="text" id="pi-filter-var-name" placeholder="e.g. articleId" />
+        </div>
+        <div class="form-group" style="flex:1;min-width:180px">
+          <label>Variable Value</label>
+          <input type="text" id="pi-filter-var-value" placeholder="Exact string value" />
+        </div>
+      </div>
+      <div id="pi-results-summary" class="mb-16"></div>
+      <div class="batch-bar" id="pi-batch-bar">
+        <span class="batch-count"><span id="pi-matched-count">0</span> matched</span>
+        <div class="batch-actions">
+          <button class="btn btn-primary btn-sm" onclick="modifyFilteredInstances()">⇄ Modify Filtered</button>
+        </div>
+        <span style="font-size:12px;color:var(--text3)">Uses Camunda asynchronous engine batches</span>
       </div>
       <div class="table-wrap" id="instances-table"></div>
     </div>
@@ -477,7 +503,7 @@
             <option value="unassigned">Unassigned</option>
           </select>
         </div>
-        <div class="form-group" style="justify-content:flex-end">
+        <div class="form-group form-group-action">
           <label>&nbsp;</label>
           <button class="btn btn-primary" onclick="loadTasks()">Search</button>
         </div>
@@ -489,6 +515,14 @@
     <div class="panel" id="panel-maintenance">
       <h2 style="font-size:18px;margin-bottom:6px;font-weight:700;letter-spacing:-.2px">🧹 Maintenance &amp; Cleanup</h2>
       <p style="color:var(--text3);font-size:13px;margin-bottom:20px;line-height:1.6">Housekeeping tools for resolving, de-duplicating, and cleaning up incidents.</p>
+
+      <div class="batch-size-section batch-size-bar">
+        <label class="batch-size-label" for="maint-batch-size">Incidents per wave:</label>
+        <input type="number" id="maint-batch-size" class="batch-size-input"
+          value="10" min="1" max="100" oninput="handleBatchSizeInput('maint-batch-size','incident')" />
+        <div id="maint-batch-size-hint" class="batch-size-hint"></div>
+        <div class="batch-size-note">Applies to every action on this page. Deleting process instances is capped lower.</div>
+      </div>
 
       <div class="maint-cards">
         <!-- Remove Duplicates Card -->
@@ -592,7 +626,7 @@
             <option value="unfinished">Running</option>
           </select>
         </div>
-        <div class="form-group" style="justify-content:flex-end">
+        <div class="form-group form-group-action">
           <label>&nbsp;</label>
           <button class="btn btn-primary" onclick="loadHistory()">Search</button>
         </div>

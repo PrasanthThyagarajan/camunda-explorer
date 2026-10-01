@@ -44,19 +44,37 @@ export interface IInstanceContext {
 /** Result from a single instance modification */
 export interface IModifyResult {
   instanceId: string;
-  status: "success" | "error";
+  status: "success" | "error" | "already_processed";
   message: string;
   previousPositions?: string[];
   newPositions?: string[];
   incidentsCleaned?: number;
 }
 
-/** Summary for batch instance modifications */
+/** Summary for asynchronous engine batch modifications */
 export interface IInstanceBatchSummary {
-  total: number;
-  succeeded: number;
-  failed: number;
-  results: IModifyResult[];
+  totalInstances: number;
+  submittedInstances: number;
+  batches: Array<{
+    batchId: string;
+    processDefinitionId: string;
+    instanceCount: number;
+    cancelActivityIds: string[];
+  }>;
+  /** Skipped because the instance had already finished before submission. */
+  alreadyProcessed: Array<{
+    instanceId: string;
+    endState: string;
+    endTime: string | null;
+    reason: string;
+  }>;
+  /** Skipped because the engine knows nothing about the ID at all. */
+  notFound: string[];
+  failedGroups: Array<{
+    processDefinitionId: string;
+    instanceCount: number;
+    message: string;
+  }>;
 }
 
 // ── History Track types ──────────────────────────────────────────

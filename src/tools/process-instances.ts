@@ -6,6 +6,11 @@ import {
   formatResponse,
   summarizeList,
 } from "../utils/response-formatter.js";
+import {
+  classifyInstance,
+  describeProcessed,
+  isInstanceGoneError,
+} from "../utils/instance-liveness.js";
 
 const variableValueSchema = z.object({
   value: z.any().describe("Variable value"),
@@ -159,15 +164,28 @@ IMPORTANT: Use camunda_get_activity_instances first to find current activity IDs
         skipIoMappings,
         annotation,
       }) => {
-        await client.post(
-          `/process-instance/${processInstanceId}/modification`,
-          {
-            skipCustomListeners: skipCustomListeners ?? false,
-            skipIoMappings: skipIoMappings ?? false,
-            instructions,
-            annotation: annotation ?? "Modified via Camunda Explorer",
+        try {
+          await client.post(
+            `/process-instance/${processInstanceId}/modification`,
+            {
+              skipCustomListeners: skipCustomListeners ?? false,
+              skipIoMappings: skipIoMappings ?? false,
+              instructions,
+              annotation: annotation ?? "Modified via Camunda Explorer",
+            }
+          );
+        } catch (error: unknown) {
+          if (isInstanceGoneError(error)) {
+            const verdict = await classifyInstance(client, processInstanceId);
+            if (verdict.state === "processed") {
+              return formatResponse(
+                null,
+                `No modification applied to ${processInstanceId}. ${describeProcessed(verdict.endState, verdict.endTime)}`
+              );
+            }
           }
-        );
+          throw error;
+        }
         return formatResponse(
           null,
           `Process instance ${processInstanceId} modified successfully.\nInstructions executed: ${instructions.length}`

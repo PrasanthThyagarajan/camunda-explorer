@@ -8,8 +8,19 @@ export const CONNECTION_TEST_TIMEOUT = 10000;
 export const DEFAULT_MAX_RESULTS = 100;
 
 export const DEFAULT_BATCH_SIZE = 10;
+/** Upper bound for the operator-supplied incident fan-out window. */
+export const MAX_INCIDENT_BATCH_SIZE = 100;
+/** Deleting process instances is irreversible, so it fans out far less widely. */
+export const MAX_DELETE_BATCH_SIZE = 25;
+/** Instances placed into each Camunda async modification batch. */
+export const DEFAULT_INSTANCE_BATCH_SIZE = 100;
+export const MAX_INSTANCE_BATCH_SIZE = 1000;
 export const MAX_INCIDENTS_FETCH = 2000;
 export const DEFAULT_RETRY_COUNT = 1;
+export const MAX_SEARCH_IDS = 2000;
+export const BY_ACTIVITY_MAX = 200;
+export const MAX_MODIFY_IDS = 2000;
+export const INSTANCE_TREE_CONCURRENCY = 20;
 
 export const MAX_GATEWAY_TRAVERSAL_HOPS = 10;
 export const BPMN_ACTIVITY_TYPES = [

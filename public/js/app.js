@@ -67,10 +67,11 @@ import {
 
 import {
   closeModifyDialog, selectModifyTarget, modifyIncidentToStart,
-  batchModifyToStart, confirmModify, modifyInstanceFromPanel,
+  batchModifyToStart, confirmModify, modifyInstanceFromPanel, modifyFilteredInstances,
   toggleSourceToken, toggleSkipListeners, toggleSkipIoMappings, setInstructionType,
-  updateAnnotationValue,
+  updateAnnotationValue, setModifyBatchSize,
 } from './components/modify-dialog.js';
+import { handleBatchSizeInput } from './components/batch-size-field.js';
 import {
   closeStartDialog, regenerateStartPayload, confirmStartInstance,
 } from './components/start-dialog.js';
@@ -223,11 +224,14 @@ window.modifyIncidentToStart = modifyIncidentToStart;
 window.batchModifyToStart = batchModifyToStart;
 window.confirmModify = confirmModify;
 window.modifyInstanceFromPanel = modifyInstanceFromPanel;
+window.modifyFilteredInstances = modifyFilteredInstances;
 window.toggleSourceToken = toggleSourceToken;
 window.toggleSkipListeners = toggleSkipListeners;
 window.toggleSkipIoMappings = toggleSkipIoMappings;
 window.setInstructionType = setInstructionType;
 window.updateAnnotationValue = updateAnnotationValue;
+window.setModifyBatchSize = setModifyBatchSize;
+window.handleBatchSizeInput = handleBatchSizeInput;
 
 // Start Instance Dialog
 window.closeStartDialog = closeStartDialog;

@@ -1,4 +1,4 @@
-import { api } from '../api-client.js';
+import { api, rawApi } from '../api-client.js';
 import { esc, shortId, fmtDate, copyBtn, buildTable, toast } from '../utils.js';
 import { panelLoaders } from '../state.js';
 import { openDetail, closeDetail } from '../detail-panel.js';
@@ -7,6 +7,11 @@ import { populateNodeFilter, clearNodeFilter } from '../components/node-filter.j
 // Tracks the last process definition key used to populate the Node filter
 // so we can detect when the user switches process and reset the node selection.
 let lastPiProcDefKey = '';
+let lastInstanceSearch = null;
+
+export function getLastInstanceSearch() {
+  return lastInstanceSearch;
+}
 
 /* ── Populate BPMN Process <select> with active definitions ───── */
 
@@ -74,21 +79,24 @@ export async function onPiProcDefChange() {
 /* ── Init filters & event wiring ─────────────────────────────── */
 
 export function initInstanceFilters() {
-  // Enter in IDs field triggers search
-  const idsInput = document.getElementById('pi-filter-ids');
-  if (idsInput) {
-    idsInput.addEventListener('keydown', (e) => {
+  for (const id of ['pi-filter-ids', 'pi-filter-bk', 'pi-filter-from', 'pi-filter-to',
+    'pi-filter-var-name', 'pi-filter-var-value']) {
+    const input = document.getElementById(id);
+    if (input) {
+      input.addEventListener('input', invalidateInstanceSearch);
+      input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); loadInstances(); }
-    });
+      });
+    }
   }
+  document.getElementById('pi-filter-state')?.addEventListener('change', invalidateInstanceSearch);
+}
 
-  // Enter in business key field triggers search
-  const bkInput = document.getElementById('pi-filter-bk');
-  if (bkInput) {
-    bkInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); loadInstances(); }
-    });
-  }
+function invalidateInstanceSearch() {
+  lastInstanceSearch = null;
+  document.getElementById('pi-batch-bar')?.classList.remove('visible');
+  const summary = document.getElementById('pi-results-summary');
+  if (summary) summary.innerHTML = '<span style="color:var(--text3)">Filters changed — run Search to apply.</span>';
 }
 
 /* ── Load Instances ──────────────────────────────────────────── */
@@ -102,6 +110,10 @@ export async function loadInstances() {
     const bk     = (document.getElementById('pi-filter-bk')?.value || '').trim();
     const st     = (document.getElementById('pi-filter-state')?.value || '');
     const nodeId = (document.getElementById('pi-filter-node')?.value || '').trim();
+    const from   = document.getElementById('pi-filter-from')?.value || '';
+    const to     = document.getElementById('pi-filter-to')?.value || '';
+    const varName = (document.getElementById('pi-filter-var-name')?.value || '').trim();
+    const varValueEl = document.getElementById('pi-filter-var-value');
 
     // Keep the Node filter in sync if procdef was changed via something other
     // than onPiProcDefChange (e.g. cross-panel navigation).
@@ -119,30 +131,43 @@ export async function loadInstances() {
       ? idsRaw.split(',').map(s => s.trim()).filter(Boolean)
       : [];
 
-    let data;
-
-    if (ids.length > 0) {
-      // Use POST body query for multiple instance IDs
-      const body = { processInstanceIds: ids };
-      if (defKey) body.processDefinitionKey = defKey;
-      if (bk) body.businessKeyLike = '%' + bk + '%';
-      if (st === 'active')       body.active = true;
-      if (st === 'suspended')    body.suspended = true;
-      if (st === 'withIncident') body.withIncident = true;
-      if (nodeId) body.activityIdIn = [nodeId];
-      data = await api('/process-instance', { method: 'POST', body });
-    } else {
-      // Standard GET query
-      const params = new URLSearchParams();
-      if (defKey) params.set('processDefinitionKey', defKey);
-      if (bk) params.set('businessKeyLike', '%' + bk + '%');
-      if (st === 'active')       params.set('active', 'true');
-      if (st === 'suspended')    params.set('suspended', 'true');
-      if (st === 'withIncident') params.set('withIncident', 'true');
-      if (nodeId) params.set('activityIdIn', nodeId);
-      params.set('maxResults', '100');
-      data = await api('/process-instance?' + params);
+    const body = { maxResults: 100 };
+    if (ids.length) body.processInstanceIds = ids;
+    if (defKey) body.processDefinitionKey = defKey;
+    if (nodeId) body.activityIdIn = [nodeId];
+    const businessKeys = bk.split(',').map(s => s.trim()).filter(Boolean);
+    const hasVariableValue = varValueEl && varValueEl.value !== '';
+    if (!defKey && (businessKeys.length > 1 || from || to || varName || hasVariableValue)) {
+      throw new Error('Select a BPMN process before using exact key lists, dates, or variables');
     }
+    if (Boolean(varName) !== Boolean(hasVariableValue)) {
+      throw new Error('Variable name and value must be provided together');
+    }
+    if (businessKeys.length > 1) body.businessKeys = businessKeys;
+    else if (businessKeys.length === 1) body.businessKeyLike = `%${businessKeys[0]}%`;
+    if (st === 'active') body.active = true;
+    if (st === 'suspended') body.suspended = true;
+    if (st === 'withIncident') body.withIncident = true;
+    if (from) body.startedAfter = new Date(from).toISOString();
+    if (to) body.startedBefore = new Date(to).toISOString();
+    if (varName) body.variableName = varName;
+    if (hasVariableValue) body.variableValue = varValueEl.value;
+
+    const result = await rawApi('/actions/instance-search', { method: 'POST', body });
+    lastInstanceSearch = { ...result, processDefinitionKey: defKey };
+    const data = result.items;
+
+    const summary = document.getElementById('pi-results-summary');
+    const nodeSummary = result.byActivity?.length
+      ? result.byActivity.map(n => `<span class="tag">${esc(n.activityId)}: ${n.count}</span>`).join(' ')
+      : (result.scoped && result.totalCount > 200 ? '<span style="color:var(--text3)">Narrow filters for node counts.</span>' : '');
+    summary.innerHTML = `<strong>Showing ${data.length} of ${result.totalCount}${result.truncated ? '+' : ''}</strong> ${nodeSummary}`;
+
+    const batchBar = document.getElementById('pi-batch-bar');
+    document.getElementById('pi-matched-count').textContent = result.matchedIds.length;
+    batchBar.classList.toggle('visible',
+      result.scoped && result.matchedIds.length > 0 && !result.truncated &&
+      Boolean(defKey) && result.definitionIdCount === 1);
 
     // Fetch jobs in parallel to know which instances have them
     let instancesWithJobs = new Set();
@@ -166,7 +191,11 @@ export async function loadInstances() {
       <button class="btn btn-outline btn-sm" style="border-color:var(--primary);color:var(--primary)" onclick="openDiagnosis('${r.id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-7 7c0 3 2 5.5 5 7v4h4v-4c3-1.5 5-4 5-7a7 7 0 0 0-7-7z"/><line x1="10" y1="22" x2="14" y2="22"/></svg> Diagnose</button>
     `;
     document.getElementById('instances-table').innerHTML = buildTable(cols, data, actions);
-  } catch (e) { document.getElementById('instances-table').innerHTML = `<div class="error-box">${e.message}</div>`; }
+  } catch (e) {
+    lastInstanceSearch = null;
+    document.getElementById('pi-batch-bar')?.classList.remove('visible');
+    document.getElementById('instances-table').innerHTML = `<div class="error-box">${esc(e.message)}</div>`;
+  }
 }
 
 /* ── Parsed activity tree rendering ───────────────────────────── */

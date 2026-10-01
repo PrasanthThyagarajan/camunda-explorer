@@ -6,6 +6,7 @@ import { openDetail, closeDetail } from '../detail-panel.js';
 import { showProgress, updateProgress, finishProgress } from '../progress.js';
 import { openModifyDialog, modifyIncidentToStart, batchModifyToStart } from '../components/modify-dialog.js';
 import { populateNodeFilter, clearNodeFilter } from '../components/node-filter.js';
+import { readBatchSize, BATCH_PRESETS } from '../components/batch-size-field.js';
 
 // Tracks the last process definition key used to populate the Node filter
 // so we can detect when the user switches process and reset the node selection.
@@ -375,9 +376,14 @@ export function deselectAllIncidents() {
 export async function batchRetry() {
   const ids = getSelectedIncidentIds();
   if (ids.length === 0) { toast('Select incidents first', 'error'); return; }
-  if (!confirm(`Retry ${ids.length} incident(s)? This will set job retries to 1.`)) return;
+  const batchSize = readBatchSize('batch-size', 'incident');
+  if (batchSize === null) {
+    const { min, max } = BATCH_PRESETS.incident;
+    toast(`Retry batch size must be a whole number between ${min} and ${max}`, 'error');
+    return;
+  }
+  if (!confirm(`Retry ${ids.length} incident(s) in waves of ${batchSize}? This will set job retries to 1.`)) return;
 
-  const batchSize = parseInt(document.getElementById('batch-size').value) || 10;
   showProgress(`Retrying ${ids.length} incidents (batch size: ${batchSize})`);
   updateProgress(0, ids.length, 'Sending request…');
 

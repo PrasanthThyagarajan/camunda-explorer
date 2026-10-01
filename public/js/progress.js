@@ -19,18 +19,26 @@ export function updateProgress(current, total, detail) {
   if (detail) document.getElementById('progress-detail').textContent = detail;
 }
 
+const RESULT_STYLE = {
+  success: { cls: 'result-ok', icon: '✅' },
+  skipped: { cls: 'result-skip', icon: '⊘' },
+  error: { cls: 'result-err', icon: '❌' },
+};
+
 export function finishProgress(result) {
+  const skipped = result.skipped || 0;
   document.getElementById('progress-bar').style.width = '100%';
-  document.getElementById('progress-status').textContent =
-    `Done! ✅ ${result.succeeded} succeeded, ❌ ${result.failed} failed`;
+  document.getElementById('progress-status').textContent = result.statusText ||
+    `Done! ✅ ${result.succeeded} succeeded` +
+    (skipped > 0 ? `, ⊘ ${skipped} already processed` : '') +
+    `, ❌ ${result.failed} failed`;
   document.getElementById('progress-close-btn').style.display = '';
 
   const container = document.getElementById('progress-results');
   container.style.display = '';
   let html = '';
   (result.results || []).forEach(r => {
-    const cls = r.status === 'success' ? 'result-ok' : 'result-err';
-    const icon = r.status === 'success' ? '✅' : '❌';
+    const { cls, icon } = RESULT_STYLE[r.status] || RESULT_STYLE.error;
     html += `<div class="result-item"><span class="${cls}">${icon}</span><span>${shortId(r.incidentId)}</span><span class="${cls}">${esc(r.message)}</span></div>`;
   });
   container.innerHTML = html;

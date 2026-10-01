@@ -18,6 +18,11 @@ import { buildBpmnIntelligence } from "../services/intelligence/bpmn-intelligenc
 import { clusterFailures } from "../services/intelligence/failure-clusterer.js";
 import { recoveryLedger } from "../services/intelligence/recovery-ledger.js";
 import { MODIFICATION_REQUEST_TIMEOUT } from "../constants.js";
+import {
+  classifyInstance,
+  describeProcessed,
+  isInstanceGoneError,
+} from "../utils/instance-liveness.js";
 
 export function createIntelligenceRoutes(
   envService: EnvironmentService
@@ -355,6 +360,20 @@ export function createIntelligenceRoutes(
 
       let result: { success: boolean; message: string };
 
+      // A finished instance is reported and returned immediately — never
+      // written to the recovery ledger, which trains the suggestion ranker.
+      const respondIfProcessed = async (error: unknown): Promise<boolean> => {
+        if (!isInstanceGoneError(error)) return false;
+        const verdict = await classifyInstance(client, instanceId);
+        if (verdict.state !== "processed") return false;
+        res.status(409).json({
+          success: false,
+          skipped: true,
+          message: describeProcessed(verdict.endState, verdict.endTime),
+        });
+        return true;
+      };
+
       switch (type) {
         case "retry": {
           // Find the failed job and set retries to 1
@@ -366,6 +385,14 @@ export function createIntelligenceRoutes(
           });
           const jobs = jobsRes.data || [];
           if (jobs.length === 0) {
+            const verdict = await classifyInstance(client, instanceId);
+            if (verdict.state === "processed") {
+              return res.status(409).json({
+                success: false,
+                skipped: true,
+                message: describeProcessed(verdict.endState, verdict.endTime),
+              });
+            }
             return res.status(404).json({
               error: "No failed job found for this instance",
             });
@@ -393,11 +420,26 @@ export function createIntelligenceRoutes(
             });
           }
 
-          const tree2Res = await client.get(
-            `/process-instance/${instanceId}/activity-instances`
-          );
+          let tree2Res;
+          try {
+            tree2Res = await client.get(
+              `/process-instance/${instanceId}/activity-instances`
+            );
+          } catch (error: unknown) {
+            if (await respondIfProcessed(error)) return;
+            throw error;
+          }
           // Restart intentionally cancels everything
           const cancelIds2 = extractAllActiveIds(tree2Res.data);
+
+          // Without a token to cancel this would inject a new token into the
+          // instance rather than restarting it.
+          if (cancelIds2.length === 0) {
+            return res.status(409).json({
+              success: false,
+              message: "Instance has no active tokens — nothing to restart.",
+            });
+          }
 
           const instructions2 = [
             ...cancelIds2.map((id: string) => ({
@@ -410,10 +452,15 @@ export function createIntelligenceRoutes(
             },
           ];
 
-          await client.post(
-            `/process-instance/${instanceId}/modification`,
-            { instructions: instructions2, skipCustomListeners: false, skipIoMappings: false }
-          );
+          try {
+            await client.post(
+              `/process-instance/${instanceId}/modification`,
+              { instructions: instructions2, skipCustomListeners: false, skipIoMappings: false }
+            );
+          } catch (error: unknown) {
+            if (await respondIfProcessed(error)) return;
+            throw error;
+          }
 
           result = {
             success: true,

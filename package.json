@@ -16,6 +16,8 @@
     "inspector:dev": "mcp-inspector tsx src/index.ts",
     "dashboard": "tsc && node dist/dashboard/server.js",
     "dashboard:dev": "tsx src/dashboard/server.ts",
+    "test": "vitest run",
+    "check:frontend": "node scripts/check-frontend-imports.mjs",
     "lint": "eslint src/",
     "clean": "rimraf dist"
   },
@@ -34,7 +36,8 @@
     "@types/node": "^22.13.0",
     "rimraf": "^6.0.1",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.7"
   },
   "engines": {
     "node": ">=18.0.0"

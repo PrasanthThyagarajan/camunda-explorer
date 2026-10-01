@@ -451,6 +451,14 @@ td:hover .copy-btn,
 .form-group textarea { font-family: var(--mono); min-height: 120px; resize: vertical; line-height: 1.5; }
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
 .form-group input:hover:not(:focus), .form-group select:hover:not(:focus), .form-group textarea:hover:not(:focus) { border-color: var(--border-hover); }
+/* A button sharing a filter row sits next to 180px-floor inputs, so it has to
+   match their box rather than the smaller default .btn one. */
+.form-group-action .btn { flex: 1; padding: 9px 16px; font-size: 13px; border: 1px solid transparent; }
+/* Date/time inputs size from their internal editor rather than padding, so they
+   land 2px taller than the text inputs beside them. Pin them to the same box. */
+.form-group input[type="datetime-local"],
+.form-group input[type="date"],
+.form-group input[type="time"] { height: 37px; }
 
 /* ── Environment Cards ────────────────────────────────────────────── */
 .env-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-bottom: 24px; }
@@ -545,6 +553,15 @@ a:hover { color: var(--primary); text-decoration: underline; }
 .progress-results .result-item:last-child { border-bottom: none; }
 .result-ok { color: var(--green); }
 .result-err { color: var(--red); }
+.result-skip { color: var(--text3); }
+.batch-size-section { margin: 12px 0; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); }
+.batch-size-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--text2); margin-right: 8px; }
+.batch-size-input { width: 120px; padding: 6px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 13px; }
+.batch-size-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); outline: none; }
+.batch-size-hint { font-size: 11px; color: var(--text3); margin-top: 4px; }
+.batch-size-hint-error { color: var(--red); }
+.batch-size-bar { margin-bottom: 20px; }
+.batch-size-note { font-size: 11px; color: var(--text3); margin-top: 6px; }
 
 /* ── Modify Dialog ────────────────────────────────────────────────── */
 .modify-dialog-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--overlay-bg); z-index: 350; justify-content: center; align-items: center; backdrop-filter: blur(4px); }

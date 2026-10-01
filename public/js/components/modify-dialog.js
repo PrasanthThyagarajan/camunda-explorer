@@ -3,6 +3,7 @@ import { esc, shortId, toast } from '../utils.js';
 import { state } from '../state.js';
 import { refreshCurrentPanel } from '../navigation.js';
 import { showProgress, updateProgress, finishProgress } from '../progress.js';
+import { BATCH_PRESETS, renderBatchSizeField, syncBatchSizeHint } from './batch-size-field.js';
 
 /* ── Dialog open / close ──────────────────────────────────────── */
 
@@ -21,7 +22,54 @@ const DEFAULT_DIALOG_STATE = {
   skipCustomListeners: false,
   skipIoMappings: false,
   annotation: '',
+  startEventId: null,
+  firstActivityId: null,
+  batchSize: null,
 };
+
+const MODIFY_BATCH_FIELD_ID = 'modify-batch-size';
+
+/**
+ * A long-running dashboard server keeps serving its old build while the browser
+ * picks up new static files on reload. Fail with something actionable rather
+ * than an opaque "undefined is not a function" further down.
+ */
+export function assertBatchModifyShape(result) {
+  const required = ['alreadyProcessed', 'notFound', 'batches', 'failedGroups'];
+  if (!result || required.some(key => !Array.isArray(result[key]))) {
+    throw new Error(
+      'Unexpected response shape from the dashboard server. It is probably running an older build — restart it and retry.'
+    );
+  }
+}
+
+/** Flattens the server's two skip buckets into progress rows. */
+export function toSkippedResults(result) {
+  return [
+    ...result.alreadyProcessed.map(item => ({
+      incidentId: item.instanceId, status: 'skipped', message: item.reason,
+    })),
+    ...result.notFound.map(instanceId => ({
+      incidentId: instanceId, status: 'skipped', message: 'Skipped — unknown to the engine',
+    })),
+  ];
+}
+const BATCH_MODES = new Set(['batch', 'batch-instance']);
+
+/** Preset and work total for the batch-size field, per dialog mode. */
+function batchContext() {
+  const { mode, instanceIds, incidentIds } = state.modifyDialog;
+  return mode === 'batch-instance'
+    ? { preset: 'instance', total: instanceIds.length }
+    : { preset: 'incident', total: incidentIds.length };
+}
+
+/** Single-item modes carry no batch size, so they must not be gated on one. */
+function batchSizeAccepted() {
+  const { mode, batchSize } = state.modifyDialog;
+  return !BATCH_MODES.has(mode) || batchSize !== null;
+}
+let batchSubmissionUncertain = false;
 
 export function openModifyDialog() {
   document.getElementById('modify-dialog-overlay').classList.add('visible');
@@ -44,6 +92,10 @@ export function closeModifyDialog() {
 /* ── Target selection ─────────────────────────────────────────── */
 
 export function selectModifyTarget(actId) {
+  if (state.modifyDialog.mode === 'batch-instance' && actId === state.modifyDialog.startEventId) {
+    toast(`A start event is not a safe wait state. Select ${state.modifyDialog.firstActivityId || 'the first activity'} instead.`, 'error');
+    return;
+  }
   state.modifyDialog.selectedTargetId = actId;
   document.querySelectorAll('#modify-dialog-body .act-card').forEach(el => {
     const match = el.dataset.actId === actId;
@@ -51,7 +103,7 @@ export function selectModifyTarget(actId) {
     const radio = el.querySelector('input[type="radio"]');
     if (radio) radio.checked = match;
   });
-  document.getElementById('modify-dialog-confirm').disabled = false;
+  document.getElementById('modify-dialog-confirm').disabled = !batchSizeAccepted();
   updateAnnotationPreview();
 }
 
@@ -89,6 +141,25 @@ export function setInstructionType(type) {
 
 export function updateAnnotationValue(value) {
   state.modifyDialog.annotation = value;
+}
+
+export function setModifyBatchSize() {
+  const { preset, total } = batchContext();
+  state.modifyDialog.batchSize = syncBatchSizeHint(MODIFY_BATCH_FIELD_ID, preset, total);
+  document.getElementById('modify-dialog-confirm').disabled =
+    !batchSizeAccepted() || !state.modifyDialog.selectedTargetId;
+}
+
+/** Markup for the batch-size field in whichever batch mode is open. */
+function modifyBatchSizeField() {
+  const { preset, total } = batchContext();
+  return renderBatchSizeField({
+    id: MODIFY_BATCH_FIELD_ID,
+    preset,
+    total,
+    value: state.modifyDialog.batchSize,
+    onInput: 'setModifyBatchSize()',
+  });
 }
 
 function updateAnnotationPreview() {
@@ -321,6 +392,7 @@ export async function batchModifyToStart() {
   state.modifyDialog = {
     ...DEFAULT_DIALOG_STATE,
     mode: 'batch', incidentIds: ids,
+    batchSize: BATCH_PRESETS.incident.default,
   };
 
   document.getElementById('modify-dialog-title').textContent = `⇄ Batch Modify (${ids.length} incidents)`;
@@ -340,13 +412,13 @@ export async function batchModifyToStart() {
       <span class="k">Selected</span><span class="v">${ids.length} incident(s)</span>
       <span class="k">Sample Stuck At</span><span class="v"><span class="tag tag-yellow">${esc(firstInc.activityId || '—')}</span></span>
       <span class="k">Process Def</span><span class="v">${shortId(firstInc.processDefinitionId)}</span>
-      <span class="k">Batch Size</span><span class="v">${document.getElementById('batch-size')?.value || 10}</span>
     `;
 
     const bpmnData = await rawApi(`/actions/bpmn-activities/${firstInc.processDefinitionId}`);
     state.modifyDialog.activities = bpmnData.activities;
 
-    document.getElementById('modify-dialog-body').innerHTML = renderActivityList(bpmnData.activities, firstInc.activityId);
+    document.getElementById('modify-dialog-body').innerHTML =
+      renderActivityList(bpmnData.activities, firstInc.activityId) + modifyBatchSizeField();
     document.getElementById('modify-dialog-confirm').disabled = !state.modifyDialog.selectedTargetId;
   } catch (e) {
     document.getElementById('modify-dialog-body').innerHTML = `<div class="error-box">Failed to load: ${esc(e.message)}</div>`;
@@ -422,16 +494,109 @@ export async function modifyInstanceFromPanel(instanceId) {
   }
 }
 
+export async function modifyFilteredInstances() {
+  if (batchSubmissionUncertain) {
+    toast('A previous batch submission has an unknown outcome. Check Camunda batches before retrying.', 'error');
+    return;
+  }
+  const { getLastInstanceSearch } = await import('../panels/instances.js');
+  const search = getLastInstanceSearch();
+  if (!search?.scoped || !search.processDefinitionKey) {
+    toast('Select a BPMN process and run a scoped search first', 'error');
+    return;
+  }
+  if (search.truncated) {
+    toast('Narrow the search before modifying; the matched set is truncated', 'error');
+    return;
+  }
+  if (!search.matchedIds?.length) {
+    toast('No matched process instances to modify', 'error');
+    return;
+  }
+  if (search.definitionIdCount !== 1) {
+    toast('Narrow the search to one process definition version before modifying', 'error');
+    return;
+  }
+
+  state.modifyDialog = {
+    ...DEFAULT_DIALOG_STATE,
+    mode: 'batch-instance',
+    instanceIds: [...search.matchedIds],
+    batchSize: BATCH_PRESETS.instance.default,
+  };
+  document.getElementById('modify-dialog-title').textContent =
+    `⇄ Modify Filtered (${search.matchedIds.length} instances)`;
+  document.getElementById('modify-dialog-subtitle').textContent =
+    'Select one target activity. Camunda will submit one asynchronous batch per definition version.';
+  document.getElementById('modify-dialog-info').innerHTML = `
+    <span class="k">Matched</span><span class="v">${search.matchedIds.length} instance(s)</span>
+    <span class="k">Definitions</span><span class="v">${search.definitionIdCount}</span>
+    <span class="k">Current Nodes</span><span class="v">${search.byActivity?.length || 'Computed at submit'}</span>
+  `;
+  document.getElementById('modify-dialog-body').innerHTML =
+    '<div class="modify-loading">Loading BPMN activities…</div>';
+  document.getElementById('modify-dialog-confirm').disabled = true;
+  openModifyDialog();
+
+  try {
+    const bpmn = await rawApi(`/actions/bpmn-activities/${encodeURIComponent(search.processDefinitionId)}`);
+    state.modifyDialog.activities = bpmn.activities;
+    state.modifyDialog.processDefinitionId = bpmn.processDefinitionId;
+    state.modifyDialog.startEventId = bpmn.startEventId;
+    state.modifyDialog.firstActivityId = bpmn.firstActivityId;
+    const warning = `<div class="modify-warning">This operation cancels active tokens at all BPMN nodes before starting the target. Cancelling a call activity also cancels its in-flight child process instances.</div>`;
+    document.getElementById('modify-dialog-body').innerHTML =
+      warning + renderActivityList(bpmn.activities, null)
+      + modifyBatchSizeField() + renderOptionsSection();
+    document.getElementById('modify-dialog-confirm').disabled = !state.modifyDialog.selectedTargetId;
+  } catch (e) {
+    document.getElementById('modify-dialog-body').innerHTML =
+      `<div class="error-box">Failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+async function pollModificationBatches(batches) {
+  const deadline = Date.now() + 5 * 60 * 1000;
+  const completed = new Set();
+  const failedByBatch = new Map();
+  while (completed.size < batches.length && Date.now() < deadline) {
+    await Promise.all(batches.map(async (batch) => {
+      if (completed.has(batch.batchId)) return;
+      const status = await rawApi(`/actions/batch-status/${encodeURIComponent(batch.batchId)}`);
+      failedByBatch.set(batch.batchId, status.failedJobs || 0);
+      if (status.status === 'completed' || status.status === 'failed') {
+        completed.add(batch.batchId);
+      }
+    }));
+    updateProgress(completed.size, batches.length,
+      `${completed.size}/${batches.length} engine batches complete`);
+    if (completed.size < batches.length) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+  return {
+    completed: completed.size,
+    failedJobs: [...failedByBatch.values()].reduce((sum, count) => sum + count, 0),
+    failedByBatch,
+    timedOut: completed.size < batches.length,
+  };
+}
+
 /* ══════════════════════════════════════════════════════════════════
    CONFIRM — handles all modes
    ══════════════════════════════════════════════════════════════════ */
 
 export async function confirmModify() {
-  const { mode, incidentIds, selectedTargetId } = state.modifyDialog;
+  // Captured before closeModifyDialog() below, which resets the dialog state.
+  const { mode, incidentIds, selectedTargetId, batchSize } = state.modifyDialog;
 
   // ── Incident modes (existing behavior) ──
   if (mode === 'single' || mode === 'batch') {
     if (!selectedTargetId || incidentIds.length === 0) return;
+    if (mode === 'batch' && batchSize === null) {
+      toast(`Incidents per wave must be between ${BATCH_PRESETS.incident.min} and ${BATCH_PRESETS.incident.max}`, 'error');
+      return;
+    }
     closeModifyDialog();
 
     if (mode === 'single') {
@@ -442,13 +607,14 @@ export async function confirmModify() {
         });
         if (result.succeeded > 0) {
           toast(`✅ ${result.results[0].message}`, 'success');
+        } else if (result.skipped > 0) {
+          toast(`⊘ ${result.results[0].message}`, 'info');
         } else {
           toast(`❌ ${result.results[0].message}`, 'error');
         }
         setTimeout(refreshCurrentPanel, 1000);
       } catch (e) { toast('Modify failed: ' + e.message, 'error'); }
     } else {
-      const batchSize = parseInt(document.getElementById('batch-size')?.value) || 10;
       showProgress(`Processing ${incidentIds.length} incidents (batch size: ${batchSize})`);
       updateProgress(0, incidentIds.length, 'Processing…');
       try {
@@ -503,6 +669,8 @@ export async function confirmModify() {
           msg += ` (${result.incidentsCleaned} incident(s) resolved)`;
         }
         toast(msg, 'success');
+      } else if (result.status === 'already_processed') {
+        toast(`⊘ ${result.message}`, 'info');
       } else {
         toast(`❌ ${result.message}`, 'error');
       }
@@ -515,13 +683,21 @@ export async function confirmModify() {
 
   // ── Batch instance mode ──
   if (mode === 'batch-instance') {
-    const { instanceIds } = state.modifyDialog;
+    const {
+      instanceIds, instructionType, skipCustomListeners,
+      skipIoMappings, annotation,
+    } = state.modifyDialog;
     if (!selectedTargetId || instanceIds.length === 0) return;
+    if (batchSize === null) {
+      toast(`Instances per Camunda batch must be between ${BATCH_PRESETS.instance.min} and ${BATCH_PRESETS.instance.max}`, 'error');
+      return;
+    }
+    const confirmButton = document.getElementById('modify-dialog-confirm');
+    confirmButton.disabled = true;
     closeModifyDialog();
 
-    const batchSize = parseInt(document.getElementById('batch-size')?.value) || 10;
-    showProgress(`Modifying ${instanceIds.length} instances (batch size: ${batchSize})`);
-    updateProgress(0, instanceIds.length, 'Processing…');
+    showProgress(`Submitting ${instanceIds.length} instances to Camunda in batches of ${batchSize}`);
+    updateProgress(0, 1, 'Discovering current wait states…');
 
     try {
       const result = await rawApi('/actions/batch-instance-modify', {
@@ -529,24 +705,69 @@ export async function confirmModify() {
         body: {
           instanceIds,
           targetActivityId: selectedTargetId,
+          instructionType,
+          skipCustomListeners,
+          skipIoMappings,
+          annotation: annotation || undefined,
           batchSize,
-          instructionType: state.modifyDialog.instructionType,
-          skipCustomListeners: state.modifyDialog.skipCustomListeners,
-          skipIoMappings: state.modifyDialog.skipIoMappings,
-          annotation: state.modifyDialog.annotation || undefined,
         },
       });
-      // adapt to the progress component's expected shape
+      assertBatchModifyShape(result);
+      const skippedResults = toSkippedResults(result);
+      const skippedCount = skippedResults.length;
+
+      if (result.batches.length === 0) {
+        finishProgress({
+          succeeded: 0,
+          skipped: skippedCount,
+          failed: result.totalInstances - skippedCount,
+          statusText: skippedCount === result.totalInstances
+            ? `Nothing to modify — all ${skippedCount} instance(s) were already processed`
+            : undefined,
+          results: [
+            ...skippedResults,
+            ...result.failedGroups.map(group => ({
+              incidentId: group.processDefinitionId,
+              status: 'error',
+              message: `${group.instanceCount} instance(s): ${group.message}`,
+            })),
+          ],
+        });
+        return;
+      }
+      showProgress(`Applying ${result.batches.length} Camunda engine batch(es)`);
+      const poll = await pollModificationBatches(result.batches);
+      const skipNote = skippedCount > 0 ? `; ⊘ ${skippedCount} already processed` : '';
       finishProgress({
-        succeeded: result.succeeded,
-        failed: result.failed,
-        results: result.results.map(r => ({
-          incidentId: r.instanceId,
-          status: r.status,
-          message: r.message,
-        })),
+        succeeded: !poll.timedOut && poll.failedJobs === 0 ? result.submittedInstances : 0,
+        skipped: skippedCount,
+        failed: result.failedGroups.reduce((n, g) => n + g.instanceCount, 0) + poll.failedJobs,
+        statusText: poll.timedOut
+          ? `${result.submittedInstances} submitted; Camunda batches are still running${skipNote}`
+          : poll.failedJobs > 0
+            ? `Batch stopped with ${poll.failedJobs} failed job(s); affected instance count is unknown${skipNote}`
+            : `${result.submittedInstances} instance(s) completed${skipNote}`,
+        results: [
+          ...result.batches.map(batch => ({
+            incidentId: batch.batchId,
+            status: poll.timedOut || (poll.failedByBatch.get(batch.batchId) || 0) > 0
+              ? 'error' : 'success',
+            message: poll.timedOut
+              ? `Still running. Track Camunda batch ${batch.batchId}`
+              : (poll.failedByBatch.get(batch.batchId) || 0) > 0
+                ? `${poll.failedByBatch.get(batch.batchId)} failed batch job(s)`
+                : `${batch.instanceCount} instance(s) submitted`,
+          })),
+          ...skippedResults,
+          ...result.failedGroups.map(group => ({
+            incidentId: group.processDefinitionId,
+            status: 'error',
+            message: `${group.instanceCount} instance(s): ${group.message}`,
+          })),
+        ],
       });
     } catch (e) {
+      if (e.message.includes('outcome is unknown')) batchSubmissionUncertain = true;
       finishProgress({
         succeeded: 0,
         failed: instanceIds.length,

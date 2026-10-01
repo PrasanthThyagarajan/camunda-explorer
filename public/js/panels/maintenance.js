@@ -2,6 +2,7 @@ import { api, rawApi } from '../api-client.js';
 import { esc, shortId, fmtDate, toast } from '../utils.js';
 import { state, panelLoaders } from '../state.js';
 import { showProgress, updateProgress, finishProgress } from '../progress.js';
+import { BATCH_PRESETS, readBatchSize } from '../components/batch-size-field.js';
 
 export function refreshMaintenance() {
   state.duplicateData = null;
@@ -65,10 +66,28 @@ export async function scanDuplicates() {
   }
 }
 
+const MAINT_BATCH_FIELD_ID = 'maint-batch-size';
+/** Deleting process instances is irreversible, so it never runs at the full
+ *  incident concurrency even if the operator asks for it. Mirrors the
+ *  server-side cap, which is the real guard. */
+const MAX_DELETE_BATCH_SIZE = 25;
+
+/** Reads the panel's batch size at click time. Returns null when unusable. */
+export function currentBatchSize(strategy) {
+  const size = readBatchSize(MAINT_BATCH_FIELD_ID, 'incident');
+  if (size === null) {
+    toast(`Incidents per wave must be between ${BATCH_PRESETS.incident.min} and ${BATCH_PRESETS.incident.max}`, 'error');
+    return null;
+  }
+  return strategy === 'delete' ? Math.min(size, MAX_DELETE_BATCH_SIZE) : size;
+}
+
 export async function removeDuplicateGroup(groupIdx) {
   if (!state.duplicateData || !state.duplicateData.groups[groupIdx]) return;
   const group = state.duplicateData.groups[groupIdx];
-  if (!confirm(`Remove ${group.duplicates.length} duplicate incidents for activity "${group.activityId}"?\n\nKeeping: ${shortId(group.keep.id)} (newest)\n\nThis sets retries=1 on the duplicate jobs/tasks so the engine can re-evaluate them.`)) return;
+  const batchSize = currentBatchSize('retry');
+  if (batchSize === null) return;
+  if (!confirm(`Remove ${group.duplicates.length} duplicate incidents for activity "${group.activityId}"?\n\nKeeping: ${shortId(group.keep.id)} (newest)\n\nThis sets retries=1 on the duplicate jobs/tasks so the engine can re-evaluate them.\n\nProcessing ${batchSize} at a time.`)) return;
 
   const ids = group.duplicates.map(d => d.id);
   showProgress(`Resolving ${ids.length} duplicate incidents…`);
@@ -76,7 +95,7 @@ export async function removeDuplicateGroup(groupIdx) {
 
   try {
     const result = await rawApi('/actions/batch-resolve', {
-      method: 'POST', body: { incidentIds: ids, batchSize: 10, strategy: 'retry' }
+      method: 'POST', body: { incidentIds: ids, batchSize, strategy: 'retry' }
     });
     finishProgress(result);
     setTimeout(scanDuplicates, 2000);
@@ -87,7 +106,9 @@ export async function removeDuplicateGroup(groupIdx) {
 
 export async function removeAllDuplicates() {
   if (!state.duplicateData || state.duplicateData.totalDuplicates === 0) return;
-  if (!confirm(`Resolve ALL ${state.duplicateData.totalDuplicates} duplicate incidents across ${state.duplicateData.groups.length} groups?\n\nThis keeps the newest incident in each group and resolves the rest by setting retries=1.\n\nProceed?`)) return;
+  const batchSize = currentBatchSize('retry');
+  if (batchSize === null) return;
+  if (!confirm(`Resolve ALL ${state.duplicateData.totalDuplicates} duplicate incidents across ${state.duplicateData.groups.length} groups?\n\nThis keeps the newest incident in each group and resolves the rest by setting retries=1.\n\nProcessing ${batchSize} at a time.\n\nProceed?`)) return;
 
   const allIds = state.duplicateData.groups.flatMap(g => g.duplicates.map(d => d.id));
   showProgress(`Resolving ${allIds.length} duplicate incidents…`);
@@ -95,7 +116,7 @@ export async function removeAllDuplicates() {
 
   try {
     const result = await rawApi('/actions/batch-resolve', {
-      method: 'POST', body: { incidentIds: allIds, batchSize: 10, strategy: 'retry' }
+      method: 'POST', body: { incidentIds: allIds, batchSize, strategy: 'retry' }
     });
     finishProgress(result);
     setTimeout(scanDuplicates, 2000);
@@ -137,11 +158,17 @@ export async function executeBatchResolve() {
   if (state.resolvePreviewIds.length === 0) { toast('No incidents to resolve', 'info'); return; }
   const strategy = document.getElementById('maint-resolve-strategy').value;
   const strategyLabel = strategy === 'delete' ? 'DELETE process instances' : 'set retries=1 (retry)';
+  const batchSize = currentBatchSize(strategy);
+  if (batchSize === null) return;
 
   if (strategy === 'delete') {
-    if (!confirm(`⚠️ DESTRUCTIVE: This will DELETE the process instances for ${state.resolvePreviewIds.length} incidents.\n\nThis permanently removes the process instances and all their data.\n\nAre you absolutely sure?`)) return;
+    const requested = readBatchSize(MAINT_BATCH_FIELD_ID, 'incident');
+    const capNote = requested > batchSize
+      ? `\n\nDeletion concurrency is capped at ${MAX_DELETE_BATCH_SIZE}, so ${batchSize} will be deleted at a time rather than ${requested}.`
+      : `\n\nDeleting ${batchSize} at a time.`;
+    if (!confirm(`⚠️ DESTRUCTIVE: This will DELETE the process instances for ${state.resolvePreviewIds.length} incidents.\n\nThis permanently removes the process instances and all their data.${capNote}\n\nAre you absolutely sure?`)) return;
   } else {
-    if (!confirm(`Retry ${state.resolvePreviewIds.length} incidents? This sets retries=1 so the engine re-attempts execution.\n\nStrategy: ${strategyLabel}`)) return;
+    if (!confirm(`Retry ${state.resolvePreviewIds.length} incidents? This sets retries=1 so the engine re-attempts execution.\n\nStrategy: ${strategyLabel}\n\nProcessing ${batchSize} at a time.`)) return;
   }
 
   showProgress(`Resolving ${state.resolvePreviewIds.length} incidents (${strategyLabel})…`);
@@ -149,7 +176,7 @@ export async function executeBatchResolve() {
 
   try {
     const result = await rawApi('/actions/batch-resolve', {
-      method: 'POST', body: { incidentIds: state.resolvePreviewIds, batchSize: 10, strategy }
+      method: 'POST', body: { incidentIds: state.resolvePreviewIds, batchSize, strategy }
     });
     finishProgress(result);
     state.resolvePreviewIds = [];
@@ -205,14 +232,16 @@ export async function findStaleIncidents() {
 
 export async function resolveStaleIncidents() {
   if (state.staleIncidentIds.length === 0) return;
-  if (!confirm(`Resolve ${state.staleIncidentIds.length} stale incidents by setting retries=1? The engine will re-attempt execution.`)) return;
+  const batchSize = currentBatchSize('retry');
+  if (batchSize === null) return;
+  if (!confirm(`Resolve ${state.staleIncidentIds.length} stale incidents by setting retries=1? The engine will re-attempt execution.\n\nProcessing ${batchSize} at a time.`)) return;
 
   showProgress(`Resolving ${state.staleIncidentIds.length} stale incidents…`);
   updateProgress(0, state.staleIncidentIds.length, 'Resolving stale incidents (retry strategy)…');
 
   try {
     const result = await rawApi('/actions/batch-resolve', {
-      method: 'POST', body: { incidentIds: state.staleIncidentIds, batchSize: 10, strategy: 'retry' }
+      method: 'POST', body: { incidentIds: state.staleIncidentIds, batchSize, strategy: 'retry' }
     });
     finishProgress(result);
     state.staleIncidentIds = [];

@@ -2,11 +2,16 @@ import { AxiosInstance } from "axios";
 import { parseFirstActivity } from "../parsers/bpmn-parser.js";
 import { DEFAULT_BATCH_SIZE, DEFAULT_RETRY_COUNT, MAX_INCIDENTS_FETCH } from "../constants.js";
 import { cleanupIncidentAfterModify, extractErrorMessage } from "../utils/incident-cleanup.js";
+import {
+  classifyInstance,
+  describeProcessed,
+  isInstanceGoneError,
+} from "../utils/instance-liveness.js";
 
 export interface BatchResult {
   incidentId: string;
   processInstanceId?: string;
-  status: "success" | "error";
+  status: "success" | "error" | "skipped";
   message: string;
 }
 
@@ -14,8 +19,17 @@ export interface BatchSummary {
   total: number;
   succeeded: number;
   failed: number;
+  skipped: number;
   results: BatchResult[];
 }
+
+/**
+ * An incident is a runtime-only entity, so a 404 means it is gone — either an
+ * operator resolved it or the whole instance finished. Those two causes are
+ * indistinguishable from the incident ID alone, so they share one verdict.
+ */
+const INCIDENT_GONE_MESSAGE =
+  "Skipped — incident no longer exists (already resolved or instance finished)";
 
 export interface DuplicateGroup {
   processDefinitionId: string;
@@ -116,6 +130,9 @@ export class IncidentService {
               }
             }
           } catch (error: unknown) {
+            if (isInstanceGoneError(error)) {
+              return { incidentId, status: "skipped" as const, message: INCIDENT_GONE_MESSAGE };
+            }
             return { incidentId, status: "error" as const, message: extractErrorMessage(error) };
           }
         })
@@ -167,10 +184,14 @@ export class IncidentService {
     firstActivityCache: Record<string, string | null>,
     targetActivityId?: string
   ): Promise<BatchResult> {
+    // Hoisted so the catch below can still attribute a late failure to its
+    // instance when the incident read itself succeeded.
+    let processInstanceId: string | undefined;
     try {
       const incRes = await client.get(`/incident/${incidentId}`);
       const incident = incRes.data;
-      const { processInstanceId, processDefinitionId, activityId } = incident;
+      const { processDefinitionId, activityId } = incident;
+      processInstanceId = incident.processInstanceId;
 
       if (!processInstanceId || !processDefinitionId) {
         return { incidentId, status: "error", message: "Missing processInstanceId or processDefinitionId" };
@@ -217,6 +238,21 @@ export class IncidentService {
         message: `Moved ${activityId} → ${moveToId}`,
       };
     } catch (error: unknown) {
+      if (isInstanceGoneError(error)) {
+        // The incident read succeeded, so we can name the end state precisely.
+        if (processInstanceId) {
+          const verdict = await classifyInstance(client, processInstanceId);
+          if (verdict.state === "processed") {
+            return {
+              incidentId,
+              processInstanceId,
+              status: "skipped",
+              message: describeProcessed(verdict.endState, verdict.endTime),
+            };
+          }
+        }
+        return { incidentId, processInstanceId, status: "skipped", message: INCIDENT_GONE_MESSAGE };
+      }
       return { incidentId, status: "error", message: extractErrorMessage(error) };
     }
   }
@@ -273,6 +309,9 @@ export class IncidentService {
         };
       }
     } catch (error: unknown) {
+      if (isInstanceGoneError(error)) {
+        return { incidentId, status: "skipped", message: INCIDENT_GONE_MESSAGE };
+      }
       return { incidentId, status: "error", message: extractErrorMessage(error) };
     }
   }
@@ -282,6 +321,7 @@ export class IncidentService {
       total: results.length,
       succeeded: results.filter((r) => r.status === "success").length,
       failed: results.filter((r) => r.status === "error").length,
+      skipped: results.filter((r) => r.status === "skipped").length,
       results,
     };
   }

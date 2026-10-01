@@ -1,7 +1,17 @@
 import { AxiosInstance } from "axios";
 import { parseFirstActivity, parseAllActivities } from "../parsers/bpmn-parser.js";
 import { cleanupIncidentAfterModify, extractErrorMessage } from "../utils/incident-cleanup.js";
-import { DEFAULT_BATCH_SIZE } from "../constants.js";
+import {
+  classifyEndedInstances,
+  classifyInstance,
+  describeProcessed,
+  isInstanceGoneError,
+} from "../utils/instance-liveness.js";
+import {
+  DEFAULT_INSTANCE_BATCH_SIZE,
+  INSTANCE_TREE_CONCURRENCY,
+  MAX_MODIFY_IDS,
+} from "../constants.js";
 import { logger } from "../utils/logger.js";
 import type {
   IActiveToken,
@@ -315,6 +325,25 @@ export class ProcessInstanceService {
         incidentsCleaned,
       };
     } catch (error: unknown) {
+      // A 404 anywhere above means the instance vanished — either before we
+      // started or in the window between preflight and the modification POST.
+      if (isInstanceGoneError(error)) {
+        const verdict = await classifyInstance(client, instanceId);
+        if (verdict.state === "processed") {
+          return {
+            instanceId,
+            status: "already_processed",
+            message: describeProcessed(verdict.endState, verdict.endTime),
+          };
+        }
+        if (verdict.state === "not_found") {
+          return {
+            instanceId,
+            status: "error",
+            message: "Instance not found in runtime or history.",
+          };
+        }
+      }
       return {
         instanceId,
         status: "error",
@@ -323,72 +352,281 @@ export class ProcessInstanceService {
     }
   }
 
-  /**
-   * Modify multiple process instances in batches.
-   * All instances are moved to the same target activity.
-   *
-   * Note: each instance makes two rounds of API calls — one here to discover
-   * active tokens, and one inside modifyInstance for pre-flight validation.
-   * This is deliberate: the pre-flight check uses fresh data to prevent
-   * stale-state modifications in concurrent environments.
-   */
+  /** Group instances by definition and current leaf activities, then let
+   * Camunda's job executor apply one asynchronous modification batch per group.
+   * Instances proven to have already finished are skipped and reported;
+   * instances whose state cannot be proven either way abort the whole run. */
   async batchModifyInstances(
     client: AxiosInstance,
     instanceIds: string[],
     targetActivityId: string,
-    batchSize: number = DEFAULT_BATCH_SIZE,
     options: {
       instructionType?: "startBeforeActivity" | "startAfterActivity";
       skipCustomListeners?: boolean;
       skipIoMappings?: boolean;
       annotation?: string;
+      /** Instances per Camunda async batch. Guarded against 0 so the
+       *  submission loop below can always make progress. */
+      batchSize?: number;
     } = {}
   ): Promise<IInstanceBatchSummary> {
-    const results: IModifyResult[] = [];
-
-    for (let i = 0; i < instanceIds.length; i += batchSize) {
-      const batch = instanceIds.slice(i, i + batchSize);
-      const batchResults = await Promise.all(
-        batch.map(async (instanceId) => {
-          try {
-            // discover current token positions to derive cancel targets
-            const treeRes = await client.get(
-              `/process-instance/${instanceId}/activity-instances`
-            );
-            const incRes = await client.get(`/incident`, {
-              params: { processInstanceId: instanceId },
-            }).catch(() => ({ data: [] }));
-            const activeTokens = extractActiveTokens(treeRes.data, incRes.data || []);
-            const cancelIds = activeTokens.map((t) => t.activityId);
-
-            if (cancelIds.length === 0) {
-              return {
-                instanceId,
-                status: "error" as const,
-                message: "No active tokens found",
-              };
-            }
-
-            return this.modifyInstance(
-              client, instanceId, cancelIds, targetActivityId, options
-            );
-          } catch (error: unknown) {
-            return {
-              instanceId,
-              status: "error" as const,
-              message: extractErrorMessage(error),
-            };
-          }
-        })
+    const batchSize = Number.isInteger(options.batchSize) && options.batchSize! > 0
+      ? options.batchSize!
+      : DEFAULT_INSTANCE_BATCH_SIZE;
+    const uniqueIds = [...new Set(instanceIds)];
+    if (uniqueIds.length === 0 || uniqueIds.length > MAX_MODIFY_IDS) {
+      throw Object.assign(
+        new Error(`instanceIds must contain between 1 and ${MAX_MODIFY_IDS} unique IDs`),
+        { statusCode: 400 }
       );
-      results.push(...batchResults);
+    }
+
+    const definitions = new Map<string, string>();
+    for (let i = 0; i < uniqueIds.length; i += 100) {
+      const ids = uniqueIds.slice(i, i + 100);
+      const response = await client.post("/process-instance", {
+        processInstanceIds: ids,
+      });
+      for (const instance of response.data || []) {
+        if (ids.includes(instance.id) && instance.definitionId) {
+          definitions.set(instance.id, instance.definitionId);
+        }
+      }
+    }
+
+    const alreadyProcessed: IInstanceBatchSummary["alreadyProcessed"] = [];
+    const notFound: string[] = [];
+    const unverified: string[] = [];
+
+    // Instances that finished before submission are skipped rather than
+    // aborting the run, but only when history can prove they finished.
+    const classifyMissing = async (ids: string[]): Promise<void> => {
+      const verdicts = await classifyEndedInstances(client, ids);
+      for (const instanceId of ids) {
+        const verdict = verdicts.get(instanceId) || { state: "unknown" as const };
+        if (verdict.state === "processed") {
+          alreadyProcessed.push({
+            instanceId,
+            endState: verdict.endState,
+            endTime: verdict.endTime,
+            reason: describeProcessed(verdict.endState, verdict.endTime),
+          });
+        } else if (verdict.state === "not_found") {
+          notFound.push(instanceId);
+        } else {
+          unverified.push(instanceId);
+        }
+      }
+      if (unverified.length > 0) {
+        throw Object.assign(
+          new Error(`${unverified.length} instance(s) could not be verified as running or finished; no batch was submitted`),
+          { statusCode: 409 }
+        );
+      }
+    };
+
+    await classifyMissing(uniqueIds.filter((id) => !definitions.has(id)));
+
+    const runnableIds = uniqueIds.filter((id) => definitions.has(id));
+    if (runnableIds.length === 0) {
+      return {
+        totalInstances: uniqueIds.length,
+        submittedInstances: 0,
+        batches: [],
+        alreadyProcessed,
+        notFound,
+        failedGroups: [],
+      };
+    }
+    if (new Set(definitions.values()).size !== 1) {
+      throw Object.assign(
+        new Error("Filtered modify requires one process definition version; narrow the instance set"),
+        { statusCode: 409 }
+      );
+    }
+
+    // Validate the target against every concrete definition before submitting
+    // anything. This avoids a partial multi-version operation.
+    const cancellableActivities = new Map<string, string[]>();
+    for (const definitionId of new Set(definitions.values())) {
+      const xmlResponse = await client.get(`/process-definition/${definitionId}/xml`);
+      const activities = parseAllActivities(xmlResponse.data?.bpmn20Xml || "");
+      const target = activities.find((activity) => activity.id === targetActivityId);
+      if (!target || target.type === "startEvent") {
+        throw Object.assign(
+          new Error(
+            !target
+              ? `Target activity ${targetActivityId} does not exist in ${definitionId}`
+              : `Start event ${targetActivityId} is not a safe modification target`
+          ),
+          { statusCode: 422 }
+        );
+      }
+      cancellableActivities.set(
+        definitionId,
+        activities
+          .filter((activity) => activity.type !== "endEvent")
+          .map((activity) => activity.id)
+      );
+    }
+
+    const preflightFailures: Array<{ instanceId: string; reason: string }> = [];
+    const emptyWait: string[] = [];
+    const ended: string[] = [];
+    const discovered: Array<{
+      instanceId: string;
+      definitionId: string;
+      activityIds: string[];
+    }> = [];
+
+    for (let i = 0; i < runnableIds.length; i += INSTANCE_TREE_CONCURRENCY) {
+      const ids = runnableIds.slice(i, i + INSTANCE_TREE_CONCURRENCY);
+      const results = await Promise.all(ids.map(async (instanceId) => {
+        try {
+          const response = await client.get(`/process-instance/${instanceId}/activity-instances`);
+          const tokens = extractActiveTokens(response.data, []);
+          const activityIds = [...new Set(tokens.map((token) => token.activityId))].sort();
+          return { instanceId, activityIds, error: null as unknown };
+        } catch (error: unknown) {
+          // Keep the error itself: only a 404 proves the instance ended, and a
+          // transport failure must never be mistaken for one.
+          return { instanceId, activityIds: [] as string[], error };
+        }
+      }));
+      for (const result of results) {
+        if (result.error) {
+          if (isInstanceGoneError(result.error)) ended.push(result.instanceId);
+          else preflightFailures.push({
+            instanceId: result.instanceId,
+            reason: extractErrorMessage(result.error),
+          });
+        } else if (result.activityIds.length === 0) {
+          emptyWait.push(result.instanceId);
+        } else {
+          discovered.push({
+            instanceId: result.instanceId,
+            definitionId: definitions.get(result.instanceId)!,
+            activityIds: result.activityIds,
+          });
+        }
+      }
+    }
+
+    if (preflightFailures.length > 0) {
+      throw Object.assign(
+        new Error(`${preflightFailures.length} instance(s) could not be preflighted; no batch was submitted`),
+        { statusCode: 409 }
+      );
+    }
+    if (emptyWait.length > 0) {
+      throw Object.assign(
+        new Error(`${emptyWait.length} instance(s) have no active leaf activity; no batch was submitted`),
+        { statusCode: 409 }
+      );
+    }
+
+    // Instances that ended between the runtime query and the tree fetch.
+    await classifyMissing(ended);
+
+    if (discovered.length === 0) {
+      return {
+        totalInstances: uniqueIds.length,
+        submittedInstances: 0,
+        batches: [],
+        alreadyProcessed,
+        notFound,
+        failedGroups: [],
+      };
+    }
+
+    const groups = new Map<string, {
+      processDefinitionId: string;
+      activityIds: string[];
+      instanceIds: string[];
+    }>();
+    for (const item of discovered) {
+      const group = groups.get(item.definitionId) || {
+        processDefinitionId: item.definitionId,
+        // Async jobs may execute after a token advances. Cancelling every
+        // cancellable flow node before starting the target prevents a stale
+        // wait-state snapshot from creating a second token.
+        activityIds: cancellableActivities.get(item.definitionId) || [],
+        instanceIds: [],
+      };
+      group.instanceIds.push(item.instanceId);
+      groups.set(item.definitionId, group);
+    }
+
+    const batches: IInstanceBatchSummary["batches"] = [];
+    const failedGroups: IInstanceBatchSummary["failedGroups"] = [];
+    for (const group of groups.values()) {
+      if (group.activityIds.length === 0) {
+        failedGroups.push({
+          processDefinitionId: group.processDefinitionId,
+          instanceCount: group.instanceIds.length,
+          message: "No cancellable BPMN activities found",
+        });
+        continue;
+      }
+      const instructions: Array<Record<string, unknown>> = group.activityIds.map((activityId) => ({
+        type: "cancel",
+        activityId,
+        cancelCurrentActiveActivityInstances: true,
+      }));
+      instructions.push({
+        type: options.instructionType || "startBeforeActivity",
+        activityId: targetActivityId,
+      });
+
+      for (let i = 0; i < group.instanceIds.length; i += batchSize) {
+        const chunk = group.instanceIds.slice(i, i + batchSize);
+        try {
+          const response = await client.post("/modification/executeAsync", {
+            processDefinitionId: group.processDefinitionId,
+            processInstanceIds: chunk,
+            instructions,
+            skipCustomListeners: !!options.skipCustomListeners,
+            skipIoMappings: !!options.skipIoMappings,
+            annotation: options.annotation || "Modified via Camunda Explorer",
+          });
+          if (!response.data?.id) throw new Error("Camunda did not return a batch ID");
+          batches.push({
+            batchId: response.data.id,
+            processDefinitionId: group.processDefinitionId,
+            instanceCount: chunk.length,
+            cancelActivityIds: group.activityIds,
+          });
+        } catch (error: unknown) {
+          const transport = error as { code?: string; response?: unknown };
+          if (!transport.response || transport.code === "ECONNABORTED") {
+            // Earlier chunks are already live in the engine, so name them
+            // rather than leaving the operator with nothing to track.
+            throw Object.assign(
+              new Error(
+                "Batch submission outcome is unknown; do not retry until Camunda batches are checked." +
+                (batches.length > 0
+                  ? ` ${batches.length} batch(es) already submitted: ${batches.map((b) => b.batchId).join(", ")}`
+                  : "")
+              ),
+              { statusCode: 502 }
+            );
+          }
+          failedGroups.push({
+            processDefinitionId: group.processDefinitionId,
+            instanceCount: chunk.length,
+            message: extractErrorMessage(error),
+          });
+        }
+      }
     }
 
     return {
-      total: results.length,
-      succeeded: results.filter((r) => r.status === "success").length,
-      failed: results.filter((r) => r.status === "error").length,
-      results,
+      totalInstances: uniqueIds.length,
+      submittedInstances: batches.reduce((sum, batch) => sum + batch.instanceCount, 0),
+      batches,
+      alreadyProcessed,
+      notFound,
+      failedGroups,
     };
   }
 
