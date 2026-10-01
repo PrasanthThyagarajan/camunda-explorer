@@ -1,5 +1,5 @@
 import { api } from '../api-client.js';
-import { buildTable, esc } from '../utils.js';
+import { buildTable, esc, toCamundaDate } from '../utils.js';
 import { panelLoaders } from '../state.js';
 import { updateBadge, setEngineStatus, switchPanel } from '../navigation.js';
 
@@ -35,7 +35,7 @@ export async function loadHealth() {
 
     /* ── Fetch waiting-state counts — scoped to latest definitions ── */
     const latestKeys = [...latestByKey.keys()];
-    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const fiveMinAgo = toCamundaDate(Date.now() - 5 * 60 * 1000);
 
     const [timerRes, suspRes, idleRes, msgSubs] = await Promise.all([
       // Timer jobs — POST lets us filter by processDefinitionKeyIn

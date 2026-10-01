@@ -18,6 +18,16 @@ export function fmtDate(d) {
   return d ? new Date(d).toLocaleString() : '—';
 }
 
+/**
+ * Camunda 7 rejects the ISO "Z" suffix that toISOString() produces and expects
+ * yyyy-MM-dd'T'HH:mm:ss.SSSZ with a numeric offset, so re-encode it as +0000.
+ */
+export function toCamundaDate(d) {
+  const date = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().replace('Z', '+0000');
+}
+
 const TOAST_DURATION = 4000;
 
 export function toast(msg, type = 'info') {

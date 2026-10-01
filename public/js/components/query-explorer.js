@@ -1,5 +1,5 @@
 import { api } from '../api-client.js';
-import { esc, fmtDate, buildTable, toast } from '../utils.js';
+import { esc, fmtDate, buildTable, toast, toCamundaDate } from '../utils.js';
 import { state } from '../state.js';
 
 const QE_QUERIES = {
@@ -140,9 +140,9 @@ export function toggleQueryExplorer() {
 function replaceDatePlaceholders(obj) {
   for (const key in obj) {
     if (typeof obj[key] === 'string') {
-      if (obj[key] === '__LAST_24H__') obj[key] = new Date(Date.now() - 86400000).toISOString();
-      else if (obj[key] === '__7_DAYS_AGO__') obj[key] = new Date(Date.now() - 7 * 86400000).toISOString();
-      else if (obj[key] === '__30_DAYS_AGO__') obj[key] = new Date(Date.now() - 30 * 86400000).toISOString();
+      if (obj[key] === '__LAST_24H__') obj[key] = toCamundaDate(Date.now() - 86400000);
+      else if (obj[key] === '__7_DAYS_AGO__') obj[key] = toCamundaDate(Date.now() - 7 * 86400000);
+      else if (obj[key] === '__30_DAYS_AGO__') obj[key] = toCamundaDate(Date.now() - 30 * 86400000);
     } else if (typeof obj[key] === 'object' && obj[key] !== null) {
       replaceDatePlaceholders(obj[key]);
     }
